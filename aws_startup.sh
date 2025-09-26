@@ -100,8 +100,12 @@ cd $PROJECT_DIR
 
 # 7. Clonar repositorio
 print_status "Clonando repositorio desde GitHub..."
-git clone https://github.com/IVANMAMANI2003/news.git .
-cd news
+if [ ! -d .git ]; then
+  git clone https://github.com/IVANMAMANI2003/news.git .
+else
+  print_status "Repositorio ya presente; actualizando..."
+  git pull --ff-only || true
+fi
 
 # 8. Crear archivo de configuración para AWS
 print_header "⚙️ CONFIGURANDO VARIABLES"
@@ -274,7 +278,7 @@ echo "=== INFORMACIÓN IMPORTANTE ==="
 echo "🌐 Panel de monitoreo Flower: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5555"
 echo "🗄️ Base de datos: localhost:5432 (usuario: postgres, contraseña: 123456)"
 echo "📁 Archivos de datos: $PROJECT_DIR/data/"
-echo "📋 Logs: $PROJECT_DIR/logs/"
+echo "📓 Logs: $PROJECT_DIR/logs/"
 echo "🔧 Monitoreo: $PROJECT_DIR/monitor.sh"
 echo "💾 Respaldo: $PROJECT_DIR/backup.sh"
 echo
