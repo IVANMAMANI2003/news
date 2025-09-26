@@ -9,27 +9,139 @@ Sistema completo de recolección automática de noticias de múltiples fuentes p
   - Los Andes
   - Pachamama Radio
   - Puno Noticias
-
 - **Base de datos PostgreSQL** con esquema optimizado
-- **Ejecución recursiva** cada hora automáticamente
+- **Ejecución recursiva** cada hora automáticamente (Celery Beat)
+- **Colas de tareas** con Celery + Redis (worker y beat)
+- **Monitoreo de tareas** con Flower
 - **Generación de archivos** CSV y JSON por fuente y consolidados
 - **Sistema de logging** completo
 - **Preparado para AWS** con Docker y scripts de despliegue
 - **Interfaz web** para monitoreo
 
-## 🏗️ Arquitectura
+## ☁️ Repositorio
 
+- GitHub: [`IVANMAMANI2003/news`](https://github.com/IVANMAMANI2003/news.git)
+
+## 🐳 Ejecución en Docker (recomendada)
+
+```bash
+# Construir e iniciar todos los servicios (usar sudo en AWS)
+sudo docker-compose up -d --build
+
+# Ver estado de contenedores
+sudo docker ps
+
+# Logs del worker Celery
+sudo docker logs -f news_celery_worker | sed -u 's/^/[CELERY-WORKER] /'
+
+# Logs del beat Celery
+sudo docker logs -f news_celery_beat | sed -u 's/^/[CELERY-BEAT] /'
+
+# Logs del scraper (ejecución one-shot)
+sudo docker logs -f news_scraper | sed -u 's/^/[SCRAPER] /'
+
+# Monitoreo Flower
+# URL: http://<IP-SERVIDOR>:5555
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Scrapers      │───▶│  News Manager    │───▶│   PostgreSQL    │
-│   (4 fuentes)   │    │                  │    │   Database      │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌──────────────────┐
-                       │  File Generator  │
-                       │  (CSV + JSON)    │
-                       └──────────────────┘
+
+Servicios incluidos en `docker-compose.yml`:
+- `postgres`: Base de datos
+- `redis`: Broker/Backend Celery
+- `scraper`: ejecución única de scraping (útil para pruebas)
+- `celery_worker`: procesador de tareas
+- `celery_beat`: programador (cada hora)
+- `flower`: monitoreo de tareas en `:5555`
+
+## 🔁 Programación con Celery
+
+- Tarea periódica cada hora: `tasks.scrape_all_sources`
+- Ejecutar manualmente dentro de contenedor worker:
+```bash
+sudo docker exec -it news_celery_worker bash -lc "python - <<'PY'
+from tasks import scrape_all_sources
+r = scrape_all_sources.delay()
+print('Task sent:', r.id)
+PY"
+```
+
+## 🗄️ Base de datos y verificación
+
+```bash
+# Ingresar a PostgreSQL en contenedor
+echo "SELECT fuente, COUNT(*), MAX(fecha_extraccion) FROM noticias GROUP BY fuente ORDER BY 2 DESC;" \
+  | sudo docker exec -i news_postgres psql -U postgres -d news_scraping
+```
+
+## 🧪 Pruebas rápidas
+
+```bash
+# Ejecutar scraping one-shot (fuera del schedule)
+sudo docker run --rm --network host -v $(pwd)/data:/app/data -v $(pwd)/logs:/app/logs \
+  -e DB_HOST=localhost -e DB_USER=postgres -e DB_PASSWORD=123456 \
+  $(sudo docker build -q .) python scheduler.py --mode once
+```
+
+## 🔐 Recomendaciones AWS
+
+- Anteponer `sudo` a todos los comandos del sistema: `sudo docker ...`, `sudo systemctl ...`
+- Abrir puertos: 22, 80, 5432, 5555
+- Monitorear logs en tiempo real:
+```bash
+sudo docker logs -f news_celery_worker
+sudo docker logs -f news_celery_beat
+sudo docker logs -f news_scraper
+```
+- Ver tareas en Flower: `http://<ip>:5555`
+
+## 📜 Tareas Celery
+
+Archivo: `tasks.py`
+- `scrape_all_sources`: ejecuta scraping y guarda en PostgreSQL
+- `scrape_single_source(<source_key>)`: procesa una sola fuente
+
+## 📁 Archivos relevantes
+
+- `docker-compose.yml`: orquestación (Postgres, Redis, Worker, Beat, Flower)
+- `tasks.py`: tareas Celery + beat schedule
+- `news_scraper_manager.py`: orquesta scrapers + BD + files
+- `database.py`: conexión/DDL/insert en PostgreSQL
+- `base_scraper.py` y `scrapers/*`: scrapers por sitio
+
+## 🗄️ Esquema de Base de Datos
+
+```sql
+CREATE TABLE noticias (
+    id SERIAL PRIMARY KEY,
+    titulo TEXT,
+    fecha TIMESTAMP,
+    hora TIME,
+    resumen TEXT,
+    contenido TEXT,
+    categoria VARCHAR(100),
+    autor VARCHAR(200),
+    tags TEXT,
+    url TEXT UNIQUE,
+    fecha_extraccion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    link_imagenes TEXT,
+    fuente VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## 🧭 Operaciones comunes (AWS)
+
+```bash
+# Construir y levantar todo
+sudo docker-compose up -d --build
+
+# Verificar que Beat esté programando
+sudo docker logs -f news_celery_beat | grep -E "Scheduler|scrape_all_sources"
+
+# Verificar inserciones en BD
+echo "SELECT COUNT(*) FROM noticias;" | sudo docker exec -i news_postgres psql -U postgres -d news_scraping
+
+# Reiniciar servicios
+sudo docker-compose restart
 ```
 
 ## 📋 Requisitos

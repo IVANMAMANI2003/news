@@ -21,19 +21,22 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Crear directorio para datos
-RUN mkdir -p data
+RUN mkdir -p data logs
 
-# Crear usuario no-root para seguridad
+# Usuario no-root
 RUN useradd -m -u 1000 scraper && chown -R scraper:scraper /app
 USER scraper
 
-# Variables de entorno por defecto
-ENV DB_HOST=localhost
-ENV DB_PORT=5432
-ENV DB_NAME=news_scraping
-ENV DB_USER=postgres
-ENV DB_PASSWORD=123456
-ENV LOG_LEVEL=INFO
+# Variables de entorno
+ENV DB_HOST=localhost \
+    DB_PORT=5432 \
+    DB_NAME=news_scraping \
+    DB_USER=postgres \
+    DB_PASSWORD=123456 \
+    LOG_LEVEL=INFO \
+    REDIS_HOST=redis \
+    REDIS_PORT=6379 \
+    REDIS_DB=0
 
 # Comando por defecto
 CMD ["python", "main.py"]

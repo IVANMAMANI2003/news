@@ -20,14 +20,24 @@ class DatabaseConfig:
     def get_connection_string(cls):
         return f"postgresql://{cls.USER}:{cls.PASSWORD}@{cls.HOST}:{cls.PORT}/{cls.DATABASE}"
 
+class CeleryConfig:
+    """Configuración de Celery/Redis"""
+    REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
+    REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
+    REDIS_DB = int(os.getenv('REDIS_DB', '0'))
+    BROKER_URL = os.getenv('CELERY_BROKER_URL', f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}")
+    RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', BROKER_URL)
+    TIMEZONE = os.getenv('CELERY_TIMEZONE', 'America/Lima')
+    CONCURRENCY = int(os.getenv('CELERY_CONCURRENCY', '2'))
+
 class ScrapingConfig:
     """Configuración general del scraping"""
     # Delays entre requests (segundos)
-    DELAY_BETWEEN_REQUESTS = 2
-    DELAY_BETWEEN_SOURCES = 5
+    DELAY_BETWEEN_REQUESTS = int(os.getenv('DELAY_BETWEEN_REQUESTS', '2'))
+    DELAY_BETWEEN_SOURCES = int(os.getenv('DELAY_BETWEEN_SOURCES', '5'))
     
     # Configuración de threading
-    MAX_WORKERS = 3
+    MAX_WORKERS = int(os.getenv('MAX_WORKERS', '3'))
     
     # Timeouts
     REQUEST_TIMEOUT = 30
@@ -38,11 +48,11 @@ class ScrapingConfig:
     MAX_TAGS_PER_ARTICLE = 10
     
     # Archivos de salida
-    OUTPUT_DIR = "data"
-    LOG_FILE = "scraper.log"
+    OUTPUT_DIR = os.getenv('OUTPUT_DIR', 'data')
+    LOG_FILE = os.getenv('LOG_FILE', 'scraper.log')
     
     # Configuración de ejecución recursiva
-    EXECUTION_INTERVAL_HOURS = 1
+    EXECUTION_INTERVAL_HOURS = int(os.getenv('EXECUTION_INTERVAL_HOURS', '1'))
 
 class NewsSources:
     """Configuración de las fuentes de noticias"""
@@ -103,7 +113,7 @@ class DatabaseSchema:
 
 class LoggingConfig:
     """Configuración de logging"""
-    LEVEL = "INFO"
+    LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     FILE_HANDLER = True
     CONSOLE_HANDLER = True
