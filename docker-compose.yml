@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL
+  postgres:
+    image: postgres:13
+    container_name: news_postgres
+    environment:
+      POSTGRES_DB: news_scraping
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  # Aplicación de scraping
+  scraper:
+    build: .
+    container_name: news_scraper
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: news_scraping
+      DB_USER: postgres
+      DB_PASSWORD: 123456
+      LOG_LEVEL: INFO
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    command: ["python", "scheduler.py", "--mode", "schedule", "--interval", "1"]
+
+  # Aplicación web para monitoreo (opcional)
+  web_monitor:
+    image: nginx:alpine
+    container_name: news_web_monitor
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./data:/usr/share/nginx/html/data
+    depends_on:
+      - scraper
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
