@@ -1,17 +1,18 @@
 # Dockerfile para el sistema de scraping de noticias
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 # Instalar dependencias del sistema
 RUN apt-get update && apt-get install -y \
     postgresql-client \
-    gcc \
-    g++ \
+    redis-tools \
+    curl \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Establecer directorio de trabajo
+# Crear directorio de trabajo
 WORKDIR /app
 
-# Copiar archivos de dependencias
+# Copiar archivos de requirements
 COPY requirements.txt .
 
 # Instalar dependencias de Python
@@ -20,23 +21,22 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código fuente
 COPY . .
 
-# Crear directorio para datos
+# Crear directorios necesarios
 RUN mkdir -p data logs
 
-# Usuario no-root
-RUN useradd -m -u 1000 scraper && chown -R scraper:scraper /app
+# Crear usuario no-root para seguridad
+RUN useradd -m -u 1000 scraper && \
+    chown -R scraper:scraper /app
+
+# Cambiar a usuario no-root
 USER scraper
 
-# Variables de entorno
-ENV DB_HOST=localhost \
-    DB_PORT=5432 \
-    DB_NAME=news_scraping \
-    DB_USER=postgres \
-    DB_PASSWORD=123456 \
-    LOG_LEVEL=INFO \
-    REDIS_HOST=redis \
-    REDIS_PORT=6379 \
-    REDIS_DB=0
+# Variables de entorno por defecto
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Exponer puerto (opcional, para monitoreo)
+EXPOSE 8080
 
 # Comando por defecto
-CMD ["python", "main.py"]
+CMD ["python", "scheduler.py"]

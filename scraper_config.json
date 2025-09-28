@@ -1,0 +1,34 @@
+{
+    "database": {
+        "host": "localhost",
+        "port": 5432,
+        "database": "news_scraper",
+        "user": "postgres",
+        "password": "123456"
+    },
+    "scraping": {
+        "delay_between_sources": 5,
+        "max_workers_per_source": 3,
+        "timeout": 30,
+        "max_retries": 3,
+        "enable_incremental": true,
+        "max_articles_per_source": 1000
+    },
+    "output": {
+        "save_csv": true,
+        "save_json": true,
+        "output_directory": "data",
+        "include_timestamp": true
+    },
+    "sources": {
+        "diario_sin_fronteras": true,
+        "los_andes": true,
+        "pachamama": true,
+        "puno_noticias": true
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "unified_scraper.log",
+        "max_size_mb": 10
+    }
+}

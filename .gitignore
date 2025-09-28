@@ -1,0 +1,116 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+scraper.log
+scheduler.log
+unified_scraper.log
+celery_worker.log
+celery_beat.log
+
+# Data files
+data/*.csv
+data/*.json
+data/scraping_stats.json
+noticias_*.csv
+noticias_*.json
+urls_procesadas.txt
+
+# Database
+*.db
+*.sqlite3
+
+# Configuration files with sensitive data
+.env
+.env.local
+.env.production
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Docker
+.dockerignore
+
+# AWS
+.aws/
+
+# Redis dump
+dump.rdb
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Scraping specific
+processed_urls.json
+scraped_urls.json
+scraped_urls.txt

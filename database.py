@@ -1,166 +1,215 @@
-"""
-Módulo para manejo de la base de datos PostgreSQL
-"""
 import logging
+import os
+from datetime import datetime
 from typing import Dict, List, Optional
 
 import psycopg2
 import psycopg2.extras
 
-from config import DatabaseConfig, DatabaseSchema
-
-logger = logging.getLogger(__name__)
 
 class DatabaseManager:
-    """Manejador de la base de datos PostgreSQL"""
-    
-    def __init__(self):
+    def __init__(self, host='localhost', port=5432, database='news_scraper', 
+                 user='postgres', password='123456'):
+        """
+        Inicializar el gestor de base de datos PostgreSQL
+        """
+        self.host = host
+        self.port = port
+        self.database = database
+        self.user = user
+        self.password = password
         self.connection = None
-        self.cursor = None
+        
+        # Configurar logging
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
         
     def connect(self):
-        """Establecer conexión con la base de datos"""
+        """Establecer conexión con PostgreSQL"""
         try:
             self.connection = psycopg2.connect(
-                host=DatabaseConfig.HOST,
-                port=DatabaseConfig.PORT,
-                database=DatabaseConfig.DATABASE,
-                user=DatabaseConfig.USER,
-                password=DatabaseConfig.PASSWORD
+                host=self.host,
+                port=self.port,
+                database=self.database,
+                user=self.user,
+                password=self.password
             )
-            self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            logger.info("Conexión a PostgreSQL establecida correctamente")
+            self.connection.autocommit = True
+            self.logger.info("Conexión a PostgreSQL establecida exitosamente")
             return True
-        except Exception as e:
-            logger.error(f"Error conectando a PostgreSQL: {e}")
+        except psycopg2.Error as e:
+            self.logger.error(f"Error conectando a PostgreSQL: {e}")
             return False
     
     def create_database_if_not_exists(self):
         """Crear la base de datos si no existe"""
         try:
-            # Conectar a la base de datos 'postgres' para crear la nueva BD
+            # Conectar a la base de datos por defecto 'postgres'
             temp_conn = psycopg2.connect(
-                host=DatabaseConfig.HOST,
-                port=DatabaseConfig.PORT,
+                host=self.host,
+                port=self.port,
                 database='postgres',
-                user=DatabaseConfig.USER,
-                password=DatabaseConfig.PASSWORD
+                user=self.user,
+                password=self.password
             )
             temp_conn.autocommit = True
-            temp_cursor = temp_conn.cursor()
+            cursor = temp_conn.cursor()
             
             # Verificar si la base de datos existe
-            temp_cursor.execute(
-                "SELECT 1 FROM pg_database WHERE datname = %s",
-                (DatabaseConfig.DATABASE,)
-            )
+            cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (self.database,))
+            exists = cursor.fetchone()
             
-            if not temp_cursor.fetchone():
-                # Crear la base de datos
-                temp_cursor.execute(f'CREATE DATABASE "{DatabaseConfig.DATABASE}"')
-                logger.info(f"Base de datos '{DatabaseConfig.DATABASE}' creada exitosamente")
+            if not exists:
+                cursor.execute(f"CREATE DATABASE {self.database}")
+                self.logger.info(f"Base de datos '{self.database}' creada exitosamente")
             else:
-                logger.info(f"Base de datos '{DatabaseConfig.DATABASE}' ya existe")
+                self.logger.info(f"Base de datos '{self.database}' ya existe")
             
-            temp_cursor.close()
+            cursor.close()
             temp_conn.close()
             return True
             
-        except Exception as e:
-            logger.error(f"Error creando base de datos: {e}")
+        except psycopg2.Error as e:
+            self.logger.error(f"Error creando base de datos: {e}")
             return False
     
     def create_tables(self):
         """Crear las tablas necesarias"""
+        if not self.connection:
+            self.logger.error("No hay conexión a la base de datos")
+            return False
+        
         try:
-            if not self.connection:
-                self.connect()
+            cursor = self.connection.cursor()
             
-            # Crear tabla principal
-            self.cursor.execute(DatabaseSchema.CREATE_TABLE_SQL)
-            logger.info("Tabla 'noticias' creada/verificada correctamente")
+            # Crear tabla de noticias
+            create_table_query = """
+            CREATE TABLE IF NOT EXISTS noticias (
+                id SERIAL PRIMARY KEY,
+                titulo TEXT,
+                fecha TIMESTAMP,
+                hora TIME,
+                resumen TEXT,
+                contenido TEXT,
+                categoria VARCHAR(100),
+                autor VARCHAR(200),
+                tags TEXT,
+                url TEXT UNIQUE,
+                fecha_extraccion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                link_imagenes TEXT,
+                fuente VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """
             
-            # Crear índices
-            for index_sql in DatabaseSchema.CREATE_INDEXES_SQL:
-                self.cursor.execute(index_sql)
+            cursor.execute(create_table_query)
             
-            self.connection.commit()
-            logger.info("Índices creados correctamente")
+            # Crear índices para mejorar el rendimiento
+            indexes = [
+                "CREATE INDEX IF NOT EXISTS idx_noticias_fecha ON noticias(fecha);",
+                "CREATE INDEX IF NOT EXISTS idx_noticias_fuente ON noticias(fuente);",
+                "CREATE INDEX IF NOT EXISTS idx_noticias_categoria ON noticias(categoria);",
+                "CREATE INDEX IF NOT EXISTS idx_noticias_fecha_extraccion ON noticias(fecha_extraccion);",
+                "CREATE INDEX IF NOT EXISTS idx_noticias_url ON noticias(url);"
+            ]
+            
+            for index_query in indexes:
+                cursor.execute(index_query)
+            
+            cursor.close()
+            self.logger.info("Tablas e índices creados exitosamente")
             return True
             
-        except Exception as e:
-            logger.error(f"Error creando tablas: {e}")
-            if self.connection:
-                self.connection.rollback()
+        except psycopg2.Error as e:
+            self.logger.error(f"Error creando tablas: {e}")
             return False
     
-    def insert_news(self, news_data: Dict) -> bool:
+    def insert_noticia(self, noticia_data: Dict) -> bool:
         """Insertar una noticia en la base de datos"""
+        if not self.connection:
+            self.logger.error("No hay conexión a la base de datos")
+            return False
+        
         try:
-            if not self.connection:
-                self.connect()
+            cursor = self.connection.cursor()
             
-            insert_sql = """
+            # Verificar si la URL ya existe
+            cursor.execute("SELECT id FROM noticias WHERE url = %s", (noticia_data['url'],))
+            if cursor.fetchone():
+                self.logger.info(f"Noticia ya existe: {noticia_data['url']}")
+                cursor.close()
+                return False
+            
+            # Insertar nueva noticia
+            insert_query = """
             INSERT INTO noticias (
                 titulo, fecha, hora, resumen, contenido, categoria, 
-                autor, tags, url, link_imagenes, fuente
+                autor, tags, url, link_imagenes, fuente, fecha_extraccion
             ) VALUES (
                 %(titulo)s, %(fecha)s, %(hora)s, %(resumen)s, %(contenido)s, 
-                %(categoria)s, %(autor)s, %(tags)s, %(url)s, %(link_imagenes)s, %(fuente)s
-            ) ON CONFLICT (url) DO NOTHING
+                %(categoria)s, %(autor)s, %(tags)s, %(url)s, %(link_imagenes)s, 
+                %(fuente)s, %(fecha_extraccion)s
+            )
             """
             
-            self.cursor.execute(insert_sql, news_data)
-            self.connection.commit()
+            cursor.execute(insert_query, noticia_data)
+            cursor.close()
+            
+            self.logger.info(f"Noticia insertada: {noticia_data['titulo'][:50]}...")
             return True
             
-        except Exception as e:
-            logger.error(f"Error insertando noticia: {e}")
-            if self.connection:
-                self.connection.rollback()
+        except psycopg2.Error as e:
+            self.logger.error(f"Error insertando noticia: {e}")
             return False
     
-    def insert_multiple_news(self, news_list: List[Dict]) -> int:
+    def insert_noticias_batch(self, noticias_data: List[Dict]) -> int:
         """Insertar múltiples noticias en lote"""
+        if not self.connection:
+            self.logger.error("No hay conexión a la base de datos")
+            return 0
+        
+        inserted_count = 0
+        
         try:
-            if not self.connection:
-                self.connect()
+            cursor = self.connection.cursor()
             
-            insert_sql = """
-            INSERT INTO noticias (
-                titulo, fecha, hora, resumen, contenido, categoria, 
-                autor, tags, url, link_imagenes, fuente
-            ) VALUES (
-                %(titulo)s, %(fecha)s, %(hora)s, %(resumen)s, %(contenido)s, 
-                %(categoria)s, %(autor)s, %(tags)s, %(url)s, %(link_imagenes)s, %(fuente)s
-            ) ON CONFLICT (url) DO NOTHING
-            """
-            
-            inserted_count = 0
-            for news_data in news_list:
-                try:
-                    self.cursor.execute(insert_sql, news_data)
-                    if self.cursor.rowcount > 0:
-                        inserted_count += 1
-                except Exception as e:
-                    logger.warning(f"Error insertando noticia individual: {e}")
+            for noticia_data in noticias_data:
+                # Verificar si la URL ya existe
+                cursor.execute("SELECT id FROM noticias WHERE url = %s", (noticia_data['url'],))
+                if cursor.fetchone():
                     continue
+                
+                # Insertar nueva noticia
+                insert_query = """
+                INSERT INTO noticias (
+                    titulo, fecha, hora, resumen, contenido, categoria, 
+                    autor, tags, url, link_imagenes, fuente, fecha_extraccion
+                ) VALUES (
+                    %(titulo)s, %(fecha)s, %(hora)s, %(resumen)s, %(contenido)s, 
+                    %(categoria)s, %(autor)s, %(tags)s, %(url)s, %(link_imagenes)s, 
+                    %(fuente)s, %(fecha_extraccion)s
+                )
+                """
+                
+                cursor.execute(insert_query, noticia_data)
+                inserted_count += 1
             
-            self.connection.commit()
-            logger.info(f"Insertadas {inserted_count} noticias nuevas")
+            cursor.close()
+            self.logger.info(f"Insertadas {inserted_count} noticias nuevas")
             return inserted_count
             
-        except Exception as e:
-            logger.error(f"Error insertando noticias en lote: {e}")
-            if self.connection:
-                self.connection.rollback()
+        except psycopg2.Error as e:
+            self.logger.error(f"Error insertando noticias en lote: {e}")
             return 0
     
-    def get_news_by_source(self, source: str, limit: int = 100) -> List[Dict]:
+    def get_noticias_by_fuente(self, fuente: str, limit: int = 100) -> List[Dict]:
         """Obtener noticias por fuente"""
+        if not self.connection:
+            self.logger.error("No hay conexión a la base de datos")
+            return []
+        
         try:
-            if not self.connection:
-                self.connect()
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
             query = """
             SELECT * FROM noticias 
@@ -169,83 +218,122 @@ class DatabaseManager:
             LIMIT %s
             """
             
-            self.cursor.execute(query, (source, limit))
-            return self.cursor.fetchall()
+            cursor.execute(query, (fuente, limit))
+            results = cursor.fetchall()
+            cursor.close()
             
-        except Exception as e:
-            logger.error(f"Error obteniendo noticias por fuente: {e}")
+            return [dict(row) for row in results]
+            
+        except psycopg2.Error as e:
+            self.logger.error(f"Error obteniendo noticias por fuente: {e}")
             return []
     
-    def get_recent_news(self, hours: int = 24) -> List[Dict]:
-        """Obtener noticias recientes"""
+    def get_noticias_recientes(self, limit: int = 100) -> List[Dict]:
+        """Obtener noticias más recientes"""
+        if not self.connection:
+            self.logger.error("No hay conexión a la base de datos")
+            return []
+        
         try:
-            if not self.connection:
-                self.connect()
+            cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
             query = """
             SELECT * FROM noticias 
-            WHERE fecha_extraccion >= NOW() - INTERVAL '%s hours'
-            ORDER BY fecha_extraccion DESC
+            ORDER BY fecha_extraccion DESC 
+            LIMIT %s
             """
             
-            self.cursor.execute(query, (hours,))
-            return self.cursor.fetchall()
+            cursor.execute(query, (limit,))
+            results = cursor.fetchall()
+            cursor.close()
             
-        except Exception as e:
-            logger.error(f"Error obteniendo noticias recientes: {e}")
+            return [dict(row) for row in results]
+            
+        except psycopg2.Error as e:
+            self.logger.error(f"Error obteniendo noticias recientes: {e}")
             return []
     
-    def get_statistics(self) -> Dict:
+    def get_estadisticas(self) -> Dict:
         """Obtener estadísticas de la base de datos"""
+        if not self.connection:
+            self.logger.error("No hay conexión a la base de datos")
+            return {}
+        
         try:
-            if not self.connection:
-                self.connect()
-            
-            stats = {}
+            cursor = self.connection.cursor()
             
             # Total de noticias
-            self.cursor.execute("SELECT COUNT(*) as total FROM noticias")
-            stats['total_noticias'] = self.cursor.fetchone()['total']
+            cursor.execute("SELECT COUNT(*) FROM noticias")
+            total_noticias = cursor.fetchone()[0]
             
-            # Por fuente
-            self.cursor.execute("""
-                SELECT fuente, COUNT(*) as count 
+            # Noticias por fuente
+            cursor.execute("""
+                SELECT fuente, COUNT(*) as cantidad 
                 FROM noticias 
                 GROUP BY fuente 
-                ORDER BY count DESC
+                ORDER BY cantidad DESC
             """)
-            stats['por_fuente'] = dict(self.cursor.fetchall())
+            noticias_por_fuente = dict(cursor.fetchall())
             
-            # Últimas 24 horas
-            self.cursor.execute("""
-                SELECT COUNT(*) as count 
+            # Noticias por categoría
+            cursor.execute("""
+                SELECT categoria, COUNT(*) as cantidad 
                 FROM noticias 
-                WHERE fecha_extraccion >= NOW() - INTERVAL '24 hours'
+                WHERE categoria IS NOT NULL AND categoria != ''
+                GROUP BY categoria 
+                ORDER BY cantidad DESC 
+                LIMIT 10
             """)
-            stats['ultimas_24h'] = self.cursor.fetchone()['count']
+            noticias_por_categoria = dict(cursor.fetchall())
             
-            return stats
+            # Última extracción
+            cursor.execute("""
+                SELECT MAX(fecha_extraccion) as ultima_extraccion 
+                FROM noticias
+            """)
+            ultima_extraccion = cursor.fetchone()[0]
             
-        except Exception as e:
-            logger.error(f"Error obteniendo estadísticas: {e}")
+            cursor.close()
+            
+            return {
+                'total_noticias': total_noticias,
+                'noticias_por_fuente': noticias_por_fuente,
+                'noticias_por_categoria': noticias_por_categoria,
+                'ultima_extraccion': ultima_extraccion
+            }
+            
+        except psycopg2.Error as e:
+            self.logger.error(f"Error obteniendo estadísticas: {e}")
             return {}
     
     def close(self):
         """Cerrar conexión a la base de datos"""
-        try:
-            if self.cursor:
-                self.cursor.close()
-            if self.connection:
-                self.connection.close()
-            logger.info("Conexión a PostgreSQL cerrada")
-        except Exception as e:
-            logger.error(f"Error cerrando conexión: {e}")
+        if self.connection:
+            self.connection.close()
+            self.logger.info("Conexión a PostgreSQL cerrada")
     
     def __enter__(self):
         """Context manager entry"""
+        self.create_database_if_not_exists()
         self.connect()
+        self.create_tables()
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit"""
         self.close()
+
+# Función de utilidad para inicializar la base de datos
+def initialize_database():
+    """Inicializar la base de datos con todas las tablas necesarias"""
+    with DatabaseManager() as db:
+        if db.connection:
+            print("✅ Base de datos inicializada correctamente")
+            return True
+        else:
+            print("❌ Error inicializando la base de datos")
+            return False
+
+if __name__ == "__main__":
+    # Probar la conexión y creación de tablas
+    initialize_database()

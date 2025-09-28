@@ -1,106 +1,147 @@
 version: '3.8'
 
 services:
+  # Redis para cache y colas
+  redis:
+    image: redis:7-alpine
+    container_name: news_scraper_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Base de datos PostgreSQL
   postgres:
-    image: postgres:13
-    container_name: news_postgres
+    image: postgres:15
+    container_name: news_scraper_db
     environment:
-      POSTGRES_DB: news_scraping
+      POSTGRES_DB: news_scraper
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    container_name: news_redis
     ports:
-      - "6379:6379"
+      - "5432:5432"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  scraper:
+  # Worker de Celery para scraping
+  celery-worker:
     build: .
-    container_name: news_scraper
+    container_name: news_scraper_worker
     depends_on:
-      - postgres
-      - redis
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      
+      # Base de datos
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: news_scraping
+      DB_NAME: news_scraper
       DB_USER: postgres
       DB_PASSWORD: 123456
+      
+      # Configuración de scraping
+      SCRAPING_DELAY: 1
+      SCRAPING_WORKERS: 10
+      SCRAPING_TIMEOUT: 30
+      SCRAPING_RETRIES: 3
+      SCRAPING_INCREMENTAL: "true"
+      SCRAPING_MAX_ARTICLES: 1000
+      
+      # Fuentes
+      SOURCE_SIN_FRONTERAS: "true"
+      SOURCE_LOS_ANDES: "true"
+      SOURCE_PACHAMAMA: "true"
+      SOURCE_PUNO_NOTICIAS: "true"
+      
+      # Salida
+      OUTPUT_CSV: "true"
+      OUTPUT_JSON: "true"
+      OUTPUT_DIR: "/app/data"
+      OUTPUT_TIMESTAMP: "true"
+      
+      # Logging
       LOG_LEVEL: INFO
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_DB: 0
+      LOG_FILE: "/app/logs/celery_worker.log"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - ./codigos-claude:/app/codigos-claude
     restart: unless-stopped
-    command: ["python", "scheduler.py", "--mode", "once"]
+    command: ["celery", "-A", "celery_tasks", "worker", "--loglevel=info", "--concurrency=4", "--queues=scraping,processing,database"]
+    deploy:
+      replicas: 2
 
-  celery_worker:
+  # Beat scheduler de Celery
+  celery-beat:
     build: .
-    container_name: news_celery_worker
+    container_name: news_scraper_beat
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      
+      # Base de datos
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: news_scraping
+      DB_NAME: news_scraper
       DB_USER: postgres
       DB_PASSWORD: 123456
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_DB: 0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      
+      # Logging
+      LOG_LEVEL: INFO
+      LOG_FILE: "/app/logs/celery_beat.log"
     volumes:
-      - ./data:/app/data
       - ./logs:/app/logs
-    command: ["celery", "-A", "tasks.celery_app", "worker", "--loglevel=INFO", "--concurrency=2"]
     restart: unless-stopped
+    command: ["celery", "-A", "celery_tasks", "beat", "--loglevel=info"]
 
-  celery_beat:
+  # Cliente web para monitoreo
+  celery-flower:
     build: .
-    container_name: news_celery_beat
+    container_name: news_scraper_flower
     depends_on:
       - redis
-      - postgres
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: news_scraping
-      DB_USER: postgres
-      DB_PASSWORD: 123456
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_DB: 0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-    command: ["celery", "-A", "tasks.celery_app", "beat", "--loglevel=INFO"]
-    restart: unless-stopped
-
-  flower:
-    image: mher/flower:2.0.1
-    container_name: news_celery_flower
-    depends_on:
-      - redis
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "5555:5555"
-    environment:
-      CELERY_BROKER_URL: redis://redis:6379/0
-    command: ["flower", "--broker=redis://redis:6379/0", "--port=5555"]
+    restart: unless-stopped
+    command: ["celery", "-A", "celery_tasks", "flower", "--port=5555"]
+
+  # Nginx para servir archivos (opcional)
+  nginx:
+    image: nginx:alpine
+    container_name: news_scraper_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./output:/usr/share/nginx/html/output
+    depends_on:
+      - scraper
     restart: unless-stopped
 
 volumes:
   postgres_data:
+  redis_data:

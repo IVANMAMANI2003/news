@@ -1,11 +1,9 @@
 #!/bin/bash
 
-# Script de despliegue para AWS EC2
-# Este script configura el sistema de scraping en una instancia EC2
+# Script de despliegue en AWS para el sistema de scraping de noticias
+# Este script configura una instancia EC2 con Docker y ejecuta el sistema
 
 set -e
-
-echo "🚀 Iniciando despliegue en AWS EC2..."
 
 # Colores para output
 RED='\033[0;31m'
@@ -13,8 +11,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Función para imprimir mensajes con color
-print_status() {
+# Función para imprimir mensajes
+print_message() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
@@ -26,221 +24,304 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Verificar si estamos en Ubuntu/Debian
-if ! command -v apt-get &> /dev/null; then
-    print_error "Este script está diseñado para Ubuntu/Debian. Por favor adapte para su distribución."
+# Verificar que se ejecute como root o con sudo
+if [ "$EUID" -ne 0 ]; then
+    print_error "Este script debe ejecutarse como root o con sudo"
     exit 1
 fi
 
-print_status "Actualizando sistema..."
-sudo apt-get update
+print_message "=== DESPLIEGUE EN AWS - SISTEMA DE SCRAPING DE NOTICIAS ==="
 
-print_status "Instalando dependencias del sistema..."
-sudo apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
-    postgresql \
-    postgresql-contrib \
-    nginx \
-    docker.io \
-    docker-compose \
-    git \
-    curl \
-    wget \
-    unzip
+# Actualizar sistema
+print_message "Actualizando sistema..."
+apt-get update -y
+apt-get upgrade -y
 
-print_status "Configurando PostgreSQL..."
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
+# Instalar Docker
+print_message "Instalando Docker..."
+if ! command -v docker &> /dev/null; then
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh
+    systemctl start docker
+    systemctl enable docker
+    usermod -aG docker ubuntu
+    print_message "Docker instalado correctamente"
+else
+    print_message "Docker ya está instalado"
+fi
 
-# Configurar PostgreSQL
-sudo -u postgres psql -c "CREATE USER postgres WITH PASSWORD '123456';"
-sudo -u postgres psql -c "CREATE DATABASE news_scraping OWNER postgres;"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE news_scraping TO postgres;"
+# Instalar Docker Compose
+print_message "Instalando Docker Compose..."
+if ! command -v docker-compose &> /dev/null; then
+    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+    print_message "Docker Compose instalado correctamente"
+else
+    print_message "Docker Compose ya está instalado"
+fi
 
-# Configurar PostgreSQL para conexiones remotas
-sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/*/main/postgresql.conf
-sudo sed -i "s/local   all             all                                     peer/local   all             all                                     md5/" /etc/postgresql/*/main/pg_hba.conf
-echo "host    all             all             0.0.0.0/0               md5" | sudo tee -a /etc/postgresql/*/main/pg_hba.conf
+# Instalar PostgreSQL client (para conexiones externas)
+print_message "Instalando PostgreSQL client..."
+apt-get install -y postgresql-client
 
-sudo systemctl restart postgresql
-
-print_status "Configurando Docker..."
-sudo systemctl start docker
-sudo systemctl enable docker
-sudo usermod -aG docker $USER
-
-print_status "Creando directorio del proyecto..."
-PROJECT_DIR="/opt/news_scraping"
-sudo mkdir -p $PROJECT_DIR
-sudo chown $USER:$USER $PROJECT_DIR
-
-print_status "Copiando archivos del proyecto..."
-# Asumiendo que los archivos están en el directorio actual
-cp -r . $PROJECT_DIR/
+# Crear directorio del proyecto
+PROJECT_DIR="/opt/news-scraper"
+print_message "Creando directorio del proyecto: $PROJECT_DIR"
+mkdir -p $PROJECT_DIR
 cd $PROJECT_DIR
 
-print_status "Creando entorno virtual de Python..."
-python3 -m venv venv
-source venv/bin/activate
+# Crear estructura de directorios
+mkdir -p output logs codigos-claude
 
-print_status "Instalando dependencias de Python..."
-pip install --upgrade pip
-pip install -r requirements.txt
+# Copiar archivos del proyecto (asumiendo que están en el directorio actual)
+print_message "Copiando archivos del proyecto..."
+if [ -f "requirements.txt" ]; then
+    cp requirements.txt $PROJECT_DIR/
+else
+    print_error "Archivo requirements.txt no encontrado"
+    exit 1
+fi
 
-print_status "Configurando variables de entorno..."
-cat > .env << EOF
-# Configuración de la base de datos PostgreSQL
-DB_HOST=localhost
+if [ -f "database.py" ]; then
+    cp database.py $PROJECT_DIR/
+else
+    print_error "Archivo database.py no encontrado"
+    exit 1
+fi
+
+if [ -f "unified_scraper.py" ]; then
+    cp unified_scraper.py $PROJECT_DIR/
+else
+    print_error "Archivo unified_scraper.py no encontrado"
+    exit 1
+fi
+
+if [ -f "scheduler.py" ]; then
+    cp scheduler.py $PROJECT_DIR/
+else
+    print_error "Archivo scheduler.py no encontrado"
+    exit 1
+fi
+
+if [ -f "config.py" ]; then
+    cp config.py $PROJECT_DIR/
+else
+    print_error "Archivo config.py no encontrado"
+    exit 1
+fi
+
+if [ -f "Dockerfile" ]; then
+    cp Dockerfile $PROJECT_DIR/
+else
+    print_error "Archivo Dockerfile no encontrado"
+    exit 1
+fi
+
+if [ -f "docker-compose.yml" ]; then
+    cp docker-compose.yml $PROJECT_DIR/
+else
+    print_error "Archivo docker-compose.yml no encontrado"
+    exit 1
+fi
+
+if [ -f "init.sql" ]; then
+    cp init.sql $PROJECT_DIR/
+else
+    print_error "Archivo init.sql no encontrado"
+    exit 1
+fi
+
+if [ -f "nginx.conf" ]; then
+    cp nginx.conf $PROJECT_DIR/
+else
+    print_error "Archivo nginx.conf no encontrado"
+    exit 1
+fi
+
+# Copiar directorio de scrapers
+if [ -d "codigos-claude" ]; then
+    cp -r codigos-claude/* $PROJECT_DIR/codigos-claude/
+    print_message "Scrapers copiados correctamente"
+else
+    print_warning "Directorio codigos-claude no encontrado, creando estructura básica..."
+    mkdir -p $PROJECT_DIR/codigos-claude/{diario-sinfronteras,los-andes,pachamama,puno-noticias}
+fi
+
+# Configurar firewall
+print_message "Configurando firewall..."
+ufw allow 22/tcp   # SSH
+ufw allow 80/tcp   # HTTP
+ufw allow 443/tcp  # HTTPS
+ufw allow 5432/tcp # PostgreSQL (solo para desarrollo)
+ufw --force enable
+
+# Crear archivo de variables de entorno
+print_message "Creando archivo de variables de entorno..."
+cat > $PROJECT_DIR/.env << EOF
+# Configuración de base de datos
+DB_HOST=postgres
 DB_PORT=5432
-DB_NAME=news_scraping
+DB_NAME=news_scraper
 DB_USER=postgres
 DB_PASSWORD=123456
 
-# Configuración de AWS
-AWS_REGION=us-east-1
-AWS_INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+# Configuración de scraping
+SCRAPING_DELAY=5
+SCRAPING_WORKERS=3
+SCRAPING_TIMEOUT=30
+SCRAPING_RETRIES=3
+SCRAPING_INCREMENTAL=true
+SCRAPING_MAX_ARTICLES=1000
 
-# Configuración de logging
+# Configuración de scheduler
+SCHEDULER_INTERVAL=1
+SCHEDULER_MAX_JOBS=1
+SCHEDULER_TIMEOUT=120
+SCHEDULER_RETRY=true
+SCHEDULER_MAX_RETRIES=3
+SCHEDULER_RETRY_DELAY=30
+
+# Fuentes
+SOURCE_SIN_FRONTERAS=true
+SOURCE_LOS_ANDES=true
+SOURCE_PACHAMAMA=true
+SOURCE_PUNO_NOTICIAS=true
+
+# Salida
+OUTPUT_CSV=true
+OUTPUT_JSON=true
+OUTPUT_DIR=/app/output
+OUTPUT_TIMESTAMP=true
+
+# Logging
 LOG_LEVEL=INFO
+LOG_FILE=/app/logs/unified_scraper.log
+LOG_MAX_SIZE_MB=10
+LOG_BACKUP_COUNT=5
+
+# Notificaciones
+NOTIFICATIONS_ENABLED=false
+
+# Mantenimiento
+MAINTENANCE_CLEANUP_LOGS_DAYS=30
+MAINTENANCE_CLEANUP_FILES_DAYS=7
+MAINTENANCE_DB_BACKUP=false
+MAINTENANCE_BACKUP_INTERVAL=24
 EOF
 
-print_status "Configurando Nginx..."
-sudo cp nginx.conf /etc/nginx/nginx.conf
-sudo systemctl restart nginx
-sudo systemctl enable nginx
+# Crear script de inicio
+print_message "Creando script de inicio..."
+cat > $PROJECT_DIR/start.sh << 'EOF'
+#!/bin/bash
+cd /opt/news-scraper
+docker-compose down
+docker-compose up -d
+echo "Sistema de scraping iniciado"
+echo "Base de datos: http://localhost:5432"
+echo "Archivos: http://localhost/output/"
+docker-compose logs -f
+EOF
 
-print_status "Creando servicio systemd para el scraper..."
-sudo tee /etc/systemd/system/news-scraper.service > /dev/null << EOF
+chmod +x $PROJECT_DIR/start.sh
+
+# Crear script de parada
+print_message "Creando script de parada..."
+cat > $PROJECT_DIR/stop.sh << 'EOF'
+#!/bin/bash
+cd /opt/news-scraper
+docker-compose down
+echo "Sistema de scraping detenido"
+EOF
+
+chmod +x $PROJECT_DIR/stop.sh
+
+# Crear script de monitoreo
+print_message "Creando script de monitoreo..."
+cat > $PROJECT_DIR/monitor.sh << 'EOF'
+#!/bin/bash
+cd /opt/news-scraper
+echo "=== ESTADO DEL SISTEMA ==="
+echo "Contenedores:"
+docker-compose ps
+echo ""
+echo "Logs recientes:"
+docker-compose logs --tail=20
+echo ""
+echo "Uso de disco:"
+df -h
+echo ""
+echo "Uso de memoria:"
+free -h
+EOF
+
+chmod +x $PROJECT_DIR/monitor.sh
+
+# Crear servicio systemd para auto-inicio
+print_message "Creando servicio systemd..."
+cat > /etc/systemd/system/news-scraper.service << EOF
 [Unit]
-Description=News Scraping Service
-After=network.target postgresql.service
+Description=News Scraper System
+After=docker.service
+Requires=docker.service
 
 [Service]
-Type=simple
-User=$USER
+Type=oneshot
+RemainAfterExit=yes
 WorkingDirectory=$PROJECT_DIR
-Environment=PATH=$PROJECT_DIR/venv/bin
-ExecStart=$PROJECT_DIR/venv/bin/python scheduler.py --mode schedule --interval 1
-Restart=always
-RestartSec=10
+ExecStart=$PROJECT_DIR/start.sh
+ExecStop=$PROJECT_DIR/stop.sh
+TimeoutStartSec=0
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-print_status "Habilitando y iniciando servicios..."
-sudo systemctl daemon-reload
-sudo systemctl enable news-scraper
-sudo systemctl start news-scraper
+systemctl daemon-reload
+systemctl enable news-scraper.service
 
-print_status "Configurando firewall..."
-sudo ufw allow 22/tcp
-sudo ufw allow 80/tcp
-sudo ufw allow 5432/tcp
-sudo ufw --force enable
+# Construir y ejecutar contenedores
+print_message "Construyendo contenedores Docker..."
+cd $PROJECT_DIR
+docker-compose build
 
-print_status "Creando script de monitoreo..."
-cat > monitor.sh << 'EOF'
-#!/bin/bash
-echo "=== ESTADO DEL SISTEMA DE SCRAPING ==="
-echo "Fecha: $(date)"
-echo
+print_message "Iniciando servicios..."
+docker-compose up -d
 
-echo "=== SERVICIOS ==="
-systemctl is-active postgresql
-systemctl is-active nginx
-systemctl is-active news-scraper
+# Esperar a que los servicios estén listos
+print_message "Esperando a que los servicios estén listos..."
+sleep 30
 
-echo
-echo "=== ESTADÍSTICAS DE LA BASE DE DATOS ==="
-sudo -u postgres psql -d news_scraping -c "
-SELECT 
-    fuente,
-    COUNT(*) as total_noticias,
-    MAX(fecha_extraccion) as ultima_extraccion
-FROM noticias 
-GROUP BY fuente 
-ORDER BY total_noticias DESC;
-"
+# Verificar estado
+print_message "Verificando estado de los servicios..."
+docker-compose ps
 
-echo
-echo "=== ARCHIVOS GENERADOS ==="
-ls -la data/ | head -10
+# Mostrar logs iniciales
+print_message "Mostrando logs iniciales..."
+docker-compose logs --tail=20
 
-echo
-echo "=== LOGS RECIENTES ==="
-tail -20 scraper.log
-EOF
+# Crear enlace simbólico para fácil acceso
+ln -sf $PROJECT_DIR/start.sh /usr/local/bin/news-scraper-start
+ln -sf $PROJECT_DIR/stop.sh /usr/local/bin/news-scraper-stop
+ln -sf $PROJECT_DIR/monitor.sh /usr/local/bin/news-scraper-monitor
 
-chmod +x monitor.sh
+print_message "=== DESPLIEGUE COMPLETADO ==="
+print_message "El sistema está ejecutándose en:"
+print_message "  - Base de datos: localhost:5432"
+print_message "  - Archivos de salida: http://localhost/output/"
+print_message "  - Logs: $PROJECT_DIR/logs/"
+print_message ""
+print_message "Comandos útiles:"
+print_message "  - Iniciar: news-scraper-start"
+print_message "  - Detener: news-scraper-stop"
+print_message "  - Monitorear: news-scraper-monitor"
+print_message "  - Ver logs: cd $PROJECT_DIR && docker-compose logs -f"
+print_message ""
+print_message "El sistema se ejecutará automáticamente cada hora para extraer noticias."
+print_message "Los archivos CSV y JSON se generarán en el directorio output/"
 
-print_status "Creando script de respaldo..."
-cat > backup.sh << 'EOF'
-#!/bin/bash
-BACKUP_DIR="/opt/backups/news_scraping"
-DATE=$(date +%Y%m%d_%H%M%S)
-
-mkdir -p $BACKUP_DIR
-
-# Respaldar base de datos
-pg_dump -h localhost -U postgres -d news_scraping > $BACKUP_DIR/database_$DATE.sql
-
-# Respaldar archivos de datos
-tar -czf $BACKUP_DIR/data_$DATE.tar.gz data/
-
-# Respaldar logs
-tar -czf $BACKUP_DIR/logs_$DATE.tar.gz *.log
-
-# Limpiar respaldos antiguos (mantener solo últimos 7 días)
-find $BACKUP_DIR -name "*.sql" -mtime +7 -delete
-find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
-
-echo "Respaldo completado: $BACKUP_DIR"
-EOF
-
-chmod +x backup.sh
-
-print_status "Configurando cron para respaldos diarios..."
-(crontab -l 2>/dev/null; echo "0 2 * * * $PROJECT_DIR/backup.sh") | crontab -
-
-print_status "Verificando instalación..."
-sleep 5
-
-# Verificar servicios
-if systemctl is-active --quiet postgresql; then
-    print_status "✅ PostgreSQL está funcionando"
-else
-    print_error "❌ PostgreSQL no está funcionando"
-fi
-
-if systemctl is-active --quiet nginx; then
-    print_status "✅ Nginx está funcionando"
-else
-    print_error "❌ Nginx no está funcionando"
-fi
-
-if systemctl is-active --quiet news-scraper; then
-    print_status "✅ Servicio de scraping está funcionando"
-else
-    print_error "❌ Servicio de scraping no está funcionando"
-fi
-
-print_status "🎉 Despliegue completado!"
-echo
-echo "=== INFORMACIÓN IMPORTANTE ==="
-echo "📊 Panel web: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
-echo "🗄️ Base de datos: localhost:5432 (usuario: postgres, contraseña: 123456)"
-echo "📁 Archivos de datos: $PROJECT_DIR/data/"
-echo "📋 Logs: $PROJECT_DIR/scraper.log"
-echo "🔧 Monitoreo: $PROJECT_DIR/monitor.sh"
-echo "💾 Respaldo: $PROJECT_DIR/backup.sh"
-echo
-echo "=== COMANDOS ÚTILES ==="
-echo "Ver estado: sudo systemctl status news-scraper"
-echo "Ver logs: journalctl -u news-scraper -f"
-echo "Reiniciar servicio: sudo systemctl restart news-scraper"
-echo "Monitorear: $PROJECT_DIR/monitor.sh"
-echo
-print_warning "IMPORTANTE: Configure las reglas de seguridad de AWS para permitir tráfico en los puertos 80 y 5432"
+# Mostrar información de la instancia
+print_message "=== INFORMACIÓN DE LA INSTANCIA ==="
+echo "IP pública: $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
+echo "IP privada: $(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)"
+echo "Región: $(curl -s http://169.254.169.254/latest/meta-data/placement/region)"
+echo "Tipo de instancia: $(curl -s http://169.254.169.254/latest/meta-data/instance-type)"

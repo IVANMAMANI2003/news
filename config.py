@@ -1,119 +1,197 @@
 """
-Configuración centralizada para el sistema de scraping de noticias
+Configuración central del sistema de scraping de noticias
 """
+
 import os
+from typing import Any, Dict
 
-from dotenv import load_dotenv
 
-# Cargar variables de entorno
-load_dotenv()
-
-class DatabaseConfig:
-    """Configuración de la base de datos PostgreSQL"""
-    HOST = os.getenv('DB_HOST', 'localhost')
-    PORT = os.getenv('DB_PORT', '5432')
-    DATABASE = os.getenv('DB_NAME', 'news_scraping')
-    USER = os.getenv('DB_USER', 'postgres')
-    PASSWORD = os.getenv('DB_PASSWORD', '123456')
+class Config:
+    """Configuración central del sistema"""
     
-    @classmethod
-    def get_connection_string(cls):
-        return f"postgresql://{cls.USER}:{cls.PASSWORD}@{cls.HOST}:{cls.PORT}/{cls.DATABASE}"
-
-class CeleryConfig:
-    """Configuración de Celery/Redis"""
-    REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
-    REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
-    REDIS_DB = int(os.getenv('REDIS_DB', '0'))
-    BROKER_URL = os.getenv('CELERY_BROKER_URL', f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}")
-    RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', BROKER_URL)
-    TIMEZONE = os.getenv('CELERY_TIMEZONE', 'America/Lima')
-    CONCURRENCY = int(os.getenv('CELERY_CONCURRENCY', '2'))
-
-class ScrapingConfig:
-    """Configuración general del scraping"""
-    # Delays entre requests (segundos)
-    DELAY_BETWEEN_REQUESTS = int(os.getenv('DELAY_BETWEEN_REQUESTS', '2'))
-    DELAY_BETWEEN_SOURCES = int(os.getenv('DELAY_BETWEEN_SOURCES', '5'))
+    # Configuración de base de datos
+    DATABASE = {
+        'host': os.getenv('DB_HOST', 'localhost'),
+        'port': int(os.getenv('DB_PORT', 5432)),
+        'database': os.getenv('DB_NAME', 'news_scraper'),
+        'user': os.getenv('DB_USER', 'postgres'),
+        'password': os.getenv('DB_PASSWORD', '123456')
+    }
     
-    # Configuración de threading
-    MAX_WORKERS = int(os.getenv('MAX_WORKERS', '3'))
+    # Configuración de scraping
+    SCRAPING = {
+        'delay_between_sources': int(os.getenv('SCRAPING_DELAY', 5)),
+        'max_workers_per_source': int(os.getenv('SCRAPING_WORKERS', 3)),
+        'timeout': int(os.getenv('SCRAPING_TIMEOUT', 30)),
+        'max_retries': int(os.getenv('SCRAPING_RETRIES', 3)),
+        'enable_incremental': os.getenv('SCRAPING_INCREMENTAL', 'true').lower() == 'true',
+        'max_articles_per_source': int(os.getenv('SCRAPING_MAX_ARTICLES', 1000))
+    }
     
-    # Timeouts
-    REQUEST_TIMEOUT = 30
-    MAX_RETRIES = 3
+    # Configuración de scheduler
+    SCHEDULER = {
+        'interval_hours': int(os.getenv('SCHEDULER_INTERVAL', 1)),
+        'max_concurrent_jobs': int(os.getenv('SCHEDULER_MAX_JOBS', 1)),
+        'timeout_minutes': int(os.getenv('SCHEDULER_TIMEOUT', 120)),
+        'retry_failed_jobs': os.getenv('SCHEDULER_RETRY', 'true').lower() == 'true',
+        'max_retries': int(os.getenv('SCHEDULER_MAX_RETRIES', 3)),
+        'retry_delay_minutes': int(os.getenv('SCHEDULER_RETRY_DELAY', 30))
+    }
     
-    # Límites
-    MAX_IMAGES_PER_ARTICLE = 2
-    MAX_TAGS_PER_ARTICLE = 10
-    
-    # Archivos de salida
-    OUTPUT_DIR = os.getenv('OUTPUT_DIR', 'data')
-    LOG_FILE = os.getenv('LOG_FILE', 'scraper.log')
-    
-    # Configuración de ejecución recursiva
-    EXECUTION_INTERVAL_HOURS = int(os.getenv('EXECUTION_INTERVAL_HOURS', '1'))
-
-class NewsSources:
-    """Configuración de las fuentes de noticias"""
+    # Configuración de fuentes
     SOURCES = {
         'diario_sin_fronteras': {
-            'name': 'Diario Sin Fronteras',
+            'enabled': os.getenv('SOURCE_SIN_FRONTERAS', 'true').lower() == 'true',
             'base_url': 'https://diariosinfronteras.com.pe/',
-            'enabled': True,
-            'delay': 2
+            'delay': int(os.getenv('SOURCE_SIN_FRONTERAS_DELAY', 2))
         },
         'los_andes': {
-            'name': 'Los Andes',
+            'enabled': os.getenv('SOURCE_LOS_ANDES', 'true').lower() == 'true',
             'base_url': 'https://losandes.com.pe',
-            'enabled': True,
-            'delay': 1
+            'delay': int(os.getenv('SOURCE_LOS_ANDES_DELAY', 1))
         },
         'pachamama': {
-            'name': 'Pachamama Radio',
+            'enabled': os.getenv('SOURCE_PACHAMAMA', 'true').lower() == 'true',
             'base_url': 'https://pachamamaradio.org/',
-            'enabled': True,
-            'delay': 2
+            'delay': int(os.getenv('SOURCE_PACHAMAMA_DELAY', 2))
         },
         'puno_noticias': {
-            'name': 'Puno Noticias',
+            'enabled': os.getenv('SOURCE_PUNO_NOTICIAS', 'true').lower() == 'true',
             'base_url': 'https://punonoticias.pe/',
-            'enabled': True,
-            'delay': 1
+            'delay': int(os.getenv('SOURCE_PUNO_NOTICIAS_DELAY', 1))
         }
     }
-
-class DatabaseSchema:
-    """Esquema de la base de datos"""
-    CREATE_TABLE_SQL = """
-    CREATE TABLE IF NOT EXISTS noticias (
-        id SERIAL PRIMARY KEY,
-        titulo TEXT,
-        fecha TIMESTAMP,
-        hora TIME,
-        resumen TEXT,
-        contenido TEXT,
-        categoria VARCHAR(100),
-        autor VARCHAR(200),
-        tags TEXT,
-        url TEXT UNIQUE,
-        fecha_extraccion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        link_imagenes TEXT,
-        fuente VARCHAR(100),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """
     
-    CREATE_INDEXES_SQL = [
-        "CREATE INDEX IF NOT EXISTS idx_noticias_fuente ON noticias(fuente);",
-        "CREATE INDEX IF NOT EXISTS idx_noticias_fecha ON noticias(fecha);",
-        "CREATE INDEX IF NOT EXISTS idx_noticias_categoria ON noticias(categoria);",
-        "CREATE INDEX IF NOT EXISTS idx_noticias_fecha_extraccion ON noticias(fecha_extraccion);"
-    ]
+    # Configuración de salida
+    OUTPUT = {
+        'save_csv': os.getenv('OUTPUT_CSV', 'true').lower() == 'true',
+        'save_json': os.getenv('OUTPUT_JSON', 'true').lower() == 'true',
+        'output_directory': os.getenv('OUTPUT_DIR', 'output'),
+        'include_timestamp': os.getenv('OUTPUT_TIMESTAMP', 'true').lower() == 'true'
+    }
+    
+    # Configuración de logging
+    LOGGING = {
+        'level': os.getenv('LOG_LEVEL', 'INFO'),
+        'file': os.getenv('LOG_FILE', 'unified_scraper.log'),
+        'max_size_mb': int(os.getenv('LOG_MAX_SIZE_MB', 10)),
+        'backup_count': int(os.getenv('LOG_BACKUP_COUNT', 5))
+    }
+    
+    # Configuración de notificaciones
+    NOTIFICATIONS = {
+        'enabled': os.getenv('NOTIFICATIONS_ENABLED', 'false').lower() == 'true',
+        'email': {
+            'smtp_server': os.getenv('EMAIL_SMTP_SERVER', ''),
+            'smtp_port': int(os.getenv('EMAIL_SMTP_PORT', 587)),
+            'username': os.getenv('EMAIL_USERNAME', ''),
+            'password': os.getenv('EMAIL_PASSWORD', ''),
+            'to_addresses': os.getenv('EMAIL_TO_ADDRESSES', '').split(',') if os.getenv('EMAIL_TO_ADDRESSES') else []
+        },
+        'webhook': {
+            'url': os.getenv('WEBHOOK_URL', ''),
+            'enabled': os.getenv('WEBHOOK_ENABLED', 'false').lower() == 'true'
+        }
+    }
+    
+    # Configuración de mantenimiento
+    MAINTENANCE = {
+        'cleanup_old_logs_days': int(os.getenv('MAINTENANCE_CLEANUP_LOGS_DAYS', 30)),
+        'cleanup_old_files_days': int(os.getenv('MAINTENANCE_CLEANUP_FILES_DAYS', 7)),
+        'database_backup_enabled': os.getenv('MAINTENANCE_DB_BACKUP', 'false').lower() == 'true',
+        'backup_interval_hours': int(os.getenv('MAINTENANCE_BACKUP_INTERVAL', 24))
+    }
+    
+    # Configuración de AWS (para despliegue)
+    AWS = {
+        'region': os.getenv('AWS_REGION', 'us-east-1'),
+        'access_key_id': os.getenv('AWS_ACCESS_KEY_ID', ''),
+        'secret_access_key': os.getenv('AWS_SECRET_ACCESS_KEY', ''),
+        's3_bucket': os.getenv('AWS_S3_BUCKET', ''),
+        'ec2_instance_id': os.getenv('AWS_EC2_INSTANCE_ID', '')
+    }
+    
+    @classmethod
+    def get_database_url(cls) -> str:
+        """Obtener URL de conexión a la base de datos"""
+        return f"postgresql://{cls.DATABASE['user']}:{cls.DATABASE['password']}@{cls.DATABASE['host']}:{cls.DATABASE['port']}/{cls.DATABASE['database']}"
+    
+    @classmethod
+    def get_source_config(cls, source_name: str) -> Dict[str, Any]:
+        """Obtener configuración de una fuente específica"""
+        return cls.SOURCES.get(source_name, {})
+    
+    @classmethod
+    def is_source_enabled(cls, source_name: str) -> bool:
+        """Verificar si una fuente está habilitada"""
+        source_config = cls.get_source_config(source_name)
+        return source_config.get('enabled', False)
+    
+    @classmethod
+    def get_enabled_sources(cls) -> list:
+        """Obtener lista de fuentes habilitadas"""
+        return [name for name, config in cls.SOURCES.items() if config.get('enabled', False)]
+    
+    @classmethod
+    def validate_config(cls) -> bool:
+        """Validar configuración"""
+        errors = []
+        
+        # Validar configuración de base de datos
+        if not cls.DATABASE['host']:
+            errors.append("DB_HOST no está configurado")
+        if not cls.DATABASE['user']:
+            errors.append("DB_USER no está configurado")
+        if not cls.DATABASE['password']:
+            errors.append("DB_PASSWORD no está configurado")
+        
+        # Validar que al menos una fuente esté habilitada
+        if not cls.get_enabled_sources():
+            errors.append("Ninguna fuente de noticias está habilitada")
+        
+        # Validar configuración de notificaciones si está habilitada
+        if cls.NOTIFICATIONS['enabled']:
+            if cls.NOTIFICATIONS['email']['smtp_server'] and not cls.NOTIFICATIONS['email']['username']:
+                errors.append("EMAIL_USERNAME requerido cuando las notificaciones están habilitadas")
+        
+        if errors:
+            print("Errores de configuración:")
+            for error in errors:
+                print(f"  - {error}")
+            return False
+        
+        return True
+    
+    @classmethod
+    def print_config(cls):
+        """Imprimir configuración actual"""
+        print("=== CONFIGURACIÓN ACTUAL ===")
+        print(f"Base de datos: {cls.DATABASE['host']}:{cls.DATABASE['port']}/{cls.DATABASE['database']}")
+        print(f"Usuario BD: {cls.DATABASE['user']}")
+        print(f"Intervalo scheduler: {cls.SCHEDULER['interval_hours']} horas")
+        print(f"Fuentes habilitadas: {', '.join(cls.get_enabled_sources())}")
+        print(f"Modo incremental: {cls.SCRAPING['enable_incremental']}")
+        print(f"Directorio salida: {cls.OUTPUT['output_directory']}")
+        print(f"Nivel logging: {cls.LOGGING['level']}")
+        print(f"Notificaciones: {'Habilitadas' if cls.NOTIFICATIONS['enabled'] else 'Deshabilitadas'}")
 
-class LoggingConfig:
-    """Configuración de logging"""
-    LEVEL = os.getenv('LOG_LEVEL', 'INFO')
-    FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    FILE_HANDLER = True
-    CONSOLE_HANDLER = True
+# Configuración por defecto para desarrollo local
+DEFAULT_CONFIG = {
+    'database': Config.DATABASE,
+    'scraping': Config.SCRAPING,
+    'scheduler': Config.SCHEDULER,
+    'sources': Config.SOURCES,
+    'output': Config.OUTPUT,
+    'logging': Config.LOGGING,
+    'notifications': Config.NOTIFICATIONS,
+    'maintenance': Config.MAINTENANCE
+}
+
+if __name__ == "__main__":
+    # Validar y mostrar configuración
+    if Config.validate_config():
+        print("✅ Configuración válida")
+        Config.print_config()
+    else:
+        print("❌ Configuración inválida")
+        exit(1)
