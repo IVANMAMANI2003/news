@@ -37,10 +37,10 @@ python run_complete_scraper.py
 
 ```bash
 # Iniciar todos los servicios
-docker-compose up -d
+sudo docker-compose up -d
 
 # Ver logs
-docker-compose logs -f
+sudo docker-compose logs -f
 
 # Monitorear en: http://localhost:5555
 ```
@@ -113,7 +113,7 @@ python run_complete_scraper.py
 python -c "from database import DatabaseManager; db = DatabaseManager(); db.connect(); print(db.get_estadisticas())"
 
 # Escalar workers
-docker-compose up -d --scale celery-worker=4
+sudo docker-compose up -d --scale celery-worker=4
 ```
 
 ## 📈 Rendimiento

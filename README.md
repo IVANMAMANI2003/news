@@ -80,13 +80,13 @@ python scheduler.py
 ### Docker Compose (Recomendado)
 ```bash
 # Iniciar todos los servicios
-docker-compose up -d
+sudo docker-compose up -d
 
 # Ver logs
-docker-compose logs -f
+sudo docker-compose logs -f
 
 # Escalar workers
-docker-compose up -d --scale celery-worker=4
+sudo docker-compose up -d --scale celery-worker=4
 ```
 
 ## Estructura de Datos
