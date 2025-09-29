@@ -88,7 +88,7 @@ chmod 755 data logs
 # Configurar firewall
 print "Configurando firewall..."
 ufw allow 22/tcp   # SSH
-ufw allow 8080/tcp # HTTP
+ufw allow 8081/tcp # HTTP
 ufw allow 5555/tcp # Flower
 ufw --force enable
 
@@ -96,7 +96,7 @@ ufw --force enable
 print "Configurando Nginx..."
 cat > /etc/nginx/sites-available/news-scraper << EOF
 server {
-    listen 8080;
+    listen 8081;
     server_name _;
     
     location /data/ {
@@ -126,7 +126,7 @@ server {
     }
     
     location / {
-        return 200 'Sistema de Scraping - OK\nIP: $PUBLIC_IP\nMonitoreo: http://$PUBLIC_IP:8080/monitor';
+        return 200 'Sistema de Scraping - OK\nIP: $PUBLIC_IP\nMonitoreo: http://$PUBLIC_IP:8081/monitor';
         add_header Content-Type text/plain;
     }
 }
@@ -254,11 +254,11 @@ print "  - IP Pública: $PUBLIC_IP"
 print "  - IP Privada: $PRIVATE_IP"
 print ""
 print "Servicios disponibles:"
-print "  - Web: http://$PUBLIC_IP:8080"
-print "  - Monitoreo: http://$PUBLIC_IP:8080/monitor"
+print "  - Web: http://$PUBLIC_IP:8081"
+print "  - Monitoreo: http://$PUBLIC_IP:8081/monitor"
 print "  - Flower: http://$PUBLIC_IP:5555"
-print "  - Archivos: http://$PUBLIC_IP:8080/data/"
-print "  - Logs: http://$PUBLIC_IP:8080/logs/"
+print "  - Archivos: http://$PUBLIC_IP:8081/data/"
+print "  - Logs: http://$PUBLIC_IP:8081/logs/"
 print ""
 print "Comandos de gestión:"
 print "  news-scraper start     # Iniciar"
