@@ -88,54 +88,9 @@ chmod 755 data logs
 # Configurar firewall
 print "Configurando firewall..."
 ufw allow 22/tcp   # SSH
-ufw allow 8081/tcp # HTTP
-ufw allow 5555/tcp # Flower
 ufw --force enable
 
-# Configurar Nginx
-print "Configurando Nginx..."
-cat > /etc/nginx/sites-available/news-scraper << EOF
-server {
-    listen 8081;
-    server_name _;
-    
-    location /data/ {
-        alias $PROJECT_DIR/data/;
-        autoindex on;
-    }
-    
-    location /logs/ {
-        alias $PROJECT_DIR/logs/;
-        autoindex on;
-    }
-    
-    location /monitor {
-        alias $PROJECT_DIR/data/status_report.html;
-        try_files \$uri =404;
-    }
-    
-    location /flower/ {
-        proxy_pass http://localhost:5555/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-    }
-    
-    location /api/stats {
-        return 200 '{"status": "ok", "ip": "$PUBLIC_IP"}';
-        add_header Content-Type application/json;
-    }
-    
-    location / {
-        return 200 'Sistema de Scraping - OK\nIP: $PUBLIC_IP\nMonitoreo: http://$PUBLIC_IP:8081/monitor';
-        add_header Content-Type text/plain;
-    }
-}
-EOF
-
-ln -sf /etc/nginx/sites-available/news-scraper /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
-nginx -t
-systemctl restart nginx
+# No configurar Nginx - solo usar Docker
 
 # Crear archivo .env
 print "Creando archivo de configuración..."
@@ -253,12 +208,9 @@ print "Sistema desplegado en:"
 print "  - IP Pública: $PUBLIC_IP"
 print "  - IP Privada: $PRIVATE_IP"
 print ""
-print "Servicios disponibles:"
-print "  - Web: http://$PUBLIC_IP:8081"
-print "  - Monitoreo: http://$PUBLIC_IP:8081/monitor"
-print "  - Flower: http://$PUBLIC_IP:5555"
-print "  - Archivos: http://$PUBLIC_IP:8081/data/"
-print "  - Logs: http://$PUBLIC_IP:8081/logs/"
+print "Sistema iniciado!"
+print "Ver logs: sudo docker-compose logs -f"
+print "Ejecutar scraping: sudo docker-compose exec celery-worker celery -A celery_tasks call celery_tasks.scheduled_scraping"
 print ""
 print "Comandos de gestión:"
 print "  news-scraper start     # Iniciar"
