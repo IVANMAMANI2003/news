@@ -177,10 +177,10 @@ news/
 
 ## 🌐 Despliegue en AWS
 
-### Despliegue Optimizado (Recomendado)
+### Despliegue Simple (ÚNICO SCRIPT)
 ```bash
 # En instancia EC2
-sudo ./deploy_aws_optimized.sh
+sudo ./deploy.sh
 ```
 
 ### Servicios Desplegados
@@ -192,13 +192,22 @@ sudo ./deploy_aws_optimized.sh
 - **Nginx**: Servidor web para archivos
 
 ### Monitoreo
-- **Nginx Web**: `http://[IP_PUBLICA]:8080`
+- **Web Principal**: `http://[IP_PUBLICA]:8080`
+- **Monitoreo**: `http://[IP_PUBLICA]:8080/monitor`
 - **Flower UI**: `http://[IP_PUBLICA]:5555`
-- **Archivos de datos**: `http://[IP_PUBLICA]:8080/data/`
-- **Logs del sistema**: `http://[IP_PUBLICA]:8080/logs/`
-- **Página de monitoreo**: `http://[IP_PUBLICA]:8080/monitor`
-- **API de estado**: `http://[IP_PUBLICA]:8080/api/stats`
-- **Logs**: `sudo docker-compose logs -f`
+- **Archivos**: `http://[IP_PUBLICA]:8080/data/`
+- **Logs**: `http://[IP_PUBLICA]:8080/logs/`
+
+### Comandos de Gestión
+```bash
+news-scraper start     # Iniciar sistema
+news-scraper stop      # Detener sistema
+news-scraper restart   # Reiniciar sistema
+news-scraper status    # Ver estado
+news-scraper logs      # Ver logs
+news-scraper scale 4   # Escalar workers
+news-scraper monitor   # Ver URL de monitoreo
+```
 
 ## 📊 Rendimiento
 

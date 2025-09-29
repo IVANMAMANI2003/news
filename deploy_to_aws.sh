@@ -286,8 +286,7 @@ print_message "Creando scripts de utilidad..."
 cat > $PROJECT_DIR/start.sh << 'EOF'
 #!/bin/bash
 cd /opt/news-scraper
-docker-compose up -d
-echo "✅ Sistema iniciado"
+sudo ./start_aws.sh
 EOF
 
 # Script de parada
@@ -341,13 +340,17 @@ cat > $PROJECT_DIR/scale_workers.sh << 'EOF'
 #!/bin/bash
 cd /opt/news-scraper
 
-WORKERS=${1:-4}
+WORKERS=${1:-2}
 echo "🔧 Escalando workers a $WORKERS instancias..."
 
-docker-compose up -d --scale celery-worker=$WORKERS
+# Detener workers existentes
+sudo docker-compose stop celery-worker
+
+# Escalar workers
+sudo docker-compose up -d --scale celery-worker=$WORKERS
 
 echo "✅ Workers escalados a $WORKERS instancias"
-docker-compose ps
+sudo docker-compose ps
 EOF
 
 # Script de backup
