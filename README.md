@@ -192,9 +192,13 @@ sudo ./deploy_aws_optimized.sh
 - **Nginx**: Servidor web para archivos
 
 ### Monitoreo
+- **Nginx Web**: `http://[IP_PUBLICA]:8080`
 - **Flower UI**: `http://[IP_PUBLICA]:5555`
-- **Archivos**: `http://[IP_PUBLICA]/data/`
-- **Logs**: `docker-compose logs -f`
+- **Archivos de datos**: `http://[IP_PUBLICA]:8080/data/`
+- **Logs del sistema**: `http://[IP_PUBLICA]:8080/logs/`
+- **Página de monitoreo**: `http://[IP_PUBLICA]:8080/monitor`
+- **API de estado**: `http://[IP_PUBLICA]:8080/api/stats`
+- **Logs**: `sudo docker-compose logs -f`
 
 ## 📊 Rendimiento
 

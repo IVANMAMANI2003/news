@@ -120,7 +120,7 @@ mkdir -p data logs
 # Configurar firewall
 print_message "Configurando firewall..."
 ufw allow 22/tcp   # SSH
-ufw allow 80/tcp   # HTTP
+ufw allow 8080/tcp # HTTP (Nginx)
 ufw allow 443/tcp  # HTTPS
 ufw allow 5555/tcp # Flower (monitoreo)
 ufw --force enable
@@ -188,7 +188,7 @@ EOF
 print_message "Configurando Nginx..."
 cat > /etc/nginx/sites-available/news-scraper << EOF
 server {
-    listen 80;
+    listen 8080;
     server_name _;
     
     # Servir archivos de datos
@@ -197,6 +197,20 @@ server {
         autoindex on;
         autoindex_exact_size off;
         autoindex_localtime on;
+    }
+    
+    # Servir logs del sistema
+    location /logs/ {
+        alias $PROJECT_DIR/logs/;
+        autoindex on;
+        autoindex_exact_size off;
+        autoindex_localtime on;
+    }
+    
+    # Página de monitoreo
+    location /monitor {
+        alias $PROJECT_DIR/data/status_report.html;
+        try_files \$uri =404;
     }
     
     # Proxy para Flower
@@ -208,9 +222,15 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
     
+    # API de estado
+    location /api/stats {
+        return 200 '{"status": "ok", "message": "Sistema funcionando", "ip": "$PUBLIC_IP", "instance": "$INSTANCE_ID", "region": "$REGION"}';
+        add_header Content-Type application/json;
+    }
+    
     # Página de estado
     location / {
-        return 200 'Sistema de Scraping de Noticias - OK\nIP: $PUBLIC_IP\nInstancia: $INSTANCE_ID\nRegión: $REGION';
+        return 200 'Sistema de Scraping de Noticias - OK\nIP: $PUBLIC_IP\nInstancia: $INSTANCE_ID\nRegión: $REGION\nMonitoreo: http://$PUBLIC_IP:8080/monitor';
         add_header Content-Type text/plain;
     }
 }
@@ -285,15 +305,15 @@ cd /opt/news-scraper
 
 echo "=== ESTADO DEL SISTEMA ==="
 echo "Contenedores:"
-docker-compose ps
+sudo docker-compose ps
 
 echo ""
 echo "Uso de recursos:"
-docker stats --no-stream
+sudo docker stats --no-stream
 
 echo ""
 echo "Logs recientes:"
-docker-compose logs --tail=20
+sudo docker-compose logs --tail=20
 
 echo ""
 echo "Uso de disco:"
@@ -302,6 +322,18 @@ df -h
 echo ""
 echo "Uso de memoria:"
 free -h
+
+echo ""
+echo "Estado de la base de datos:"
+sudo docker-compose exec postgres pg_isready -U postgres
+
+echo ""
+echo "Estado de Redis:"
+sudo docker-compose exec redis redis-cli ping
+
+echo ""
+echo "Página de monitoreo disponible en:"
+echo "http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080/monitor"
 EOF
 
 # Script de escalado
@@ -363,8 +395,12 @@ print_message "  - Región: $REGION"
 print_message "  - Tipo de instancia: $INSTANCE_TYPE"
 print_message ""
 print_message "Servicios disponibles:"
+print_message "  - Nginx (Web): http://$PUBLIC_IP:8080"
 print_message "  - Monitoreo (Flower): http://$PUBLIC_IP:5555"
-print_message "  - Archivos de datos: http://$PUBLIC_IP/data/"
+print_message "  - Archivos de datos: http://$PUBLIC_IP:8080/data/"
+print_message "  - Logs del sistema: http://$PUBLIC_IP:8080/logs/"
+print_message "  - Página de monitoreo: http://$PUBLIC_IP:8080/monitor"
+print_message "  - API de estado: http://$PUBLIC_IP:8080/api/stats"
 print_message "  - Base de datos: $PRIVATE_IP:5432"
 print_message "  - Redis: $PRIVATE_IP:6379"
 print_message ""

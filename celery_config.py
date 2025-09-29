@@ -86,15 +86,9 @@ celery_app.conf.update(
 
 # Configuración de beat (scheduler)
 celery_app.conf.beat_schedule = {
-    'scrape-news-every-minute': {
+    'scrape-news-every-hour': {
         'task': 'news_scraper.tasks.scheduled_scraping',
-        'schedule': 60.0,  # Cada minuto
-        'options': {'queue': 'scraping'}
-    },
-    'scrape-pachamama-every-30-seconds': {
-        'task': 'news_scraper.tasks.scrape_source',
-        'schedule': 30.0,  # Cada 30 segundos
-        'args': ('pachamama', {}),
+        'schedule': 3600.0,  # Cada hora
         'options': {'queue': 'scraping'}
     },
     'cleanup-old-data': {

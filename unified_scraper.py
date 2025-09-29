@@ -52,50 +52,6 @@ class UnifiedNewsScraper:
         
         # Inicializar scrapers
         self.scrapers = {}
-        self.news_data = []
-        self.processed_urls = set()
-        
-        # Estadísticas
-        self.stats = {
-            'total_news': 0,
-            'news_by_source': {},
-            'start_time': None,
-            'end_time': None
-        }
-    
-    def setup_logging(self):
-        """Configurar logging básico"""
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.StreamHandler(),
-                logging.FileHandler('unified_scraper.log')
-            ]
-        )
-        self.logger = logging.getLogger(__name__)
-    
-    def setup_detailed_logging(self):
-        """Configurar logging detallado para mostrar progreso"""
-        # Crear logger específico para scraping detallado
-        detailed_logger = logging.getLogger('detailed_scraping')
-        detailed_logger.setLevel(logging.INFO)
-        
-        # Handler para consola con formato detallado
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        console_handler.setFormatter(formatter)
-        
-        # Agregar handler si no existe
-        if not detailed_logger.handlers:
-            detailed_logger.addHandler(console_handler)
-        
-        self.detailed_logger = detailed_logger
-        self.setup_logging()
-        
-        # Inicializar scrapers
-        self.scrapers = {}
         
         if SinFronterasScraper:
             self.scrapers['diario_sin_fronteras'] = {

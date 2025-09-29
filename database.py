@@ -8,16 +8,17 @@ import psycopg2.extras
 
 
 class DatabaseManager:
-    def __init__(self, host='localhost', port=5432, database='news_scraper', 
-                 user='postgres', password='123456'):
+    def __init__(self, host=None, port=None, database=None, 
+                 user=None, password=None):
         """
         Inicializar el gestor de base de datos PostgreSQL
         """
-        self.host = host
-        self.port = port
-        self.database = database
-        self.user = user
-        self.password = password
+        # Configuración desde variables de entorno para AWS
+        self.host = host or os.getenv('DB_HOST', 'localhost')
+        self.port = port or int(os.getenv('DB_PORT', '5432'))
+        self.database = database or os.getenv('DB_NAME', 'news_scraper')
+        self.user = user or os.getenv('DB_USER', 'postgres')
+        self.password = password or os.getenv('DB_PASSWORD', '123456')
         self.connection = None
         
         # Configurar logging
@@ -311,6 +312,31 @@ class DatabaseManager:
         if self.connection:
             self.connection.close()
             self.logger.info("Conexión a PostgreSQL cerrada")
+    
+    def health_check(self):
+        """Verificar salud de la conexión a la base de datos"""
+        try:
+            if not self.connection:
+                self.connect()
+            
+            if self.connection:
+                cursor = self.connection.cursor()
+                cursor.execute("SELECT 1")
+                result = cursor.fetchone()
+                cursor.close()
+                
+                if result and result[0] == 1:
+                    self.logger.info("✅ Base de datos: Salud OK")
+                    return True
+                else:
+                    self.logger.error("❌ Base de datos: Respuesta inesperada")
+                    return False
+            else:
+                self.logger.error("❌ Base de datos: Sin conexión")
+                return False
+        except Exception as e:
+            self.logger.error(f"❌ Base de datos: Error en health check - {e}")
+            return False
     
     def __enter__(self):
         """Context manager entry"""

@@ -19,6 +19,7 @@ schedule>=1.2.0
 # Procesamiento de datos
 pandas>=2.0.0
 numpy>=1.24.0
+psutil>=5.9.0
 
 # Utilidades
 python-dateutil>=2.8.0
@@ -40,3 +41,8 @@ botocore>=1.31.0
 
 # Para notificaciones (opcional)
 # smtplib-ssl es parte de la librería estándar de Python
+
+# Nota: Las siguientes librerías son parte de la librería estándar de Python
+# y NO necesitan ser instaladas por separado:
+# - subprocess, hashlib, re, csv, json, os, sys, time, datetime
+# - typing, threading, signal, glob, shutil, logging, signal
