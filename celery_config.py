@@ -85,14 +85,10 @@ celery_app.conf.update(
     worker_task_log_format='[%(asctime)s: %(levelname)s/%(processName)s][%(task_name)s(%(task_id)s)] %(message)s',
 )
 
-# Configuración de beat (scheduler)
-celery_app.conf.beat_schedule = {
-    'scrape-news-every-hour': {
-        'task': 'news_scraper.tasks.scheduled_scraping',
-        'schedule': 3600.0,  # Cada hora
-        'options': {'queue': 'scraping'}
-    },
-}
+# Importar configuración de tareas programadas
+from celery_beat_schedule import beat_schedule
+
+celery_app.conf.beat_schedule = beat_schedule
 
 # Configuración de AWS (si está disponible)
 if os.getenv('AWS_ACCESS_KEY_ID'):
