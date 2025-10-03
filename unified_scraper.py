@@ -9,34 +9,32 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
-# Importar los scrapers existentes
-sys.path.append('codigos-claude/diario-sinfronteras')
-sys.path.append('codigos-claude/los-andes')
-sys.path.append('codigos-claude/pachamama')
-sys.path.append('codigos-claude/puno-noticias')
-
 from database import DatabaseManager
 
-# Importar los scrapers (adaptados para el sistema unificado)
+# Importar scrapers individuales
 try:
-    from sin_fronteras import NewsScraper as SinFronterasScraper
+    from scrapers.pachamama_scraper import PachamamaRadioScraper
 except ImportError:
-    SinFronterasScraper = None
-
-try:
-    from los_andes import LosAndesScraper
-except ImportError:
-    LosAndesScraper = None
-
-try:
-    from pachamama import PachamamaRadioScraper
-except ImportError:
+    print("⚠️  No se pudo importar PachamamaRadioScraper")
     PachamamaRadioScraper = None
 
 try:
-    from puno_noticias import PunoNoticiasScraper
+    from scrapers.los_andes_scraper import LosAndesScraper
 except ImportError:
+    print("⚠️  No se pudo importar LosAndesScraper")
+    LosAndesScraper = None
+
+try:
+    from scrapers.puno_noticias_scraper import PunoNoticiasScraper
+except ImportError:
+    print("⚠️  No se pudo importar PunoNoticiasScraper")
     PunoNoticiasScraper = None
+
+try:
+    from scrapers.diario_sin_fronteras_scraper import DiarioSinFronterasScraper
+except ImportError:
+    print("⚠️  No se pudo importar DiarioSinFronterasScraper")
+    DiarioSinFronterasScraper = None
 
 
 class UnifiedNewsScraper:
@@ -53,9 +51,9 @@ class UnifiedNewsScraper:
         # Inicializar scrapers
         self.scrapers = {}
         
-        if SinFronterasScraper:
+        if DiarioSinFronterasScraper:
             self.scrapers['diario_sin_fronteras'] = {
-                'scraper': SinFronterasScraper(),
+                'scraper': DiarioSinFronterasScraper(),
                 'base_url': 'https://diariosinfronteras.com.pe/',
                 'enabled': True
             }
@@ -280,28 +278,13 @@ class UnifiedNewsScraper:
             noticias = []
             
             # Ejecutar scraping según el tipo de scraper
-            if source_name == 'diario_sin_fronteras':
-                # Sin Fronteras tiene método run()
-                scraper.run()
+            if hasattr(scraper, 'scrape_noticias'):
+                # Nuevos scrapers con método unificado
+                scraper.scrape_noticias(max_articles=50)
                 noticias = scraper.news_data
-                
-            elif source_name == 'los_andes':
-                # Los Andes tiene método run_scraping()
-                scraper.run_scraping()
-                noticias = scraper.news_data
-                
-            elif source_name == 'pachamama':
-                # Pachamama tiene método scrape_recursivo()
-                scraper.scrape_recursivo(max_depth=10)
-                # Cargar datos del archivo JSON
-                if os.path.exists(scraper.json_file):
-                    with open(scraper.json_file, 'r', encoding='utf-8') as f:
-                        noticias = json.load(f)
-                        
-            elif source_name == 'puno_noticias':
-                # Puno Noticias tiene método scrape_all_news()
-                scraper.scrape_all_news()
-                noticias = scraper.news_data
+            else:
+                self.logger.error(f"Scraper '{source_name}' no tiene método scrape_noticias")
+                return []
             
             # Normalizar datos
             normalized_noticias = []
