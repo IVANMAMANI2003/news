@@ -12,10 +12,10 @@ beat_schedule = {
         'schedule': crontab(minute=0),  # Cada hora en el minuto 0
     },
     
-    # Limpieza de datos antiguos cada día a las 2 AM
-    'limpieza-diaria': {
-        'task': 'news_scraper.tasks.cleanup_old_data',
-        'schedule': crontab(hour=2, minute=0),  # 2:00 AM
+    # Limpieza solo de logs antiguos cada semana (no elimina noticias)
+    'limpieza-logs': {
+        'task': 'news_scraper.tasks.cleanup_old_logs_only',
+        'schedule': crontab(hour=2, minute=0, day_of_week=0),  # Domingos a las 2 AM
     },
 }
 

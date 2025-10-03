@@ -280,23 +280,39 @@ def scrape_new_news():
         logger.error(f"Error en scraping de nuevas noticias: {e}")
         raise
 
-@celery_app.task(name='news_scraper.tasks.cleanup_old_data')
-def cleanup_old_data():
+@celery_app.task(name='news_scraper.tasks.cleanup_old_logs_only')
+def cleanup_old_logs_only():
     """
-    Limpiar datos antiguos
+    Limpiar solo logs antiguos (NO elimina noticias)
     """
     try:
-        logger.info("Iniciando limpieza de datos antiguos")
+        logger.info("Iniciando limpieza de logs antiguos (manteniendo todas las noticias)")
         
-        # Limpiar archivos antiguos
-        cleanup_old_files()
-        
-        # Limpiar logs antiguos
+        # Solo limpiar logs antiguos, NO archivos de noticias
         cleanup_old_logs()
         
         return {
             'status': 'completed',
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'note': 'Solo se limpiaron logs, se mantuvieron todas las noticias'
+        }
+        
+    except Exception as e:
+        logger.error(f"Error en limpieza de logs: {e}")
+        raise
+
+@celery_app.task(name='news_scraper.tasks.cleanup_old_data')
+def cleanup_old_data():
+    """
+    Limpiar datos antiguos (DEPRECATED - ya no se usa)
+    """
+    try:
+        logger.info("Tarea de limpieza de datos deshabilitada - se mantienen todas las noticias")
+        
+        return {
+            'status': 'disabled',
+            'timestamp': datetime.now().isoformat(),
+            'note': 'Limpieza de datos deshabilitada para mantener todas las noticias'
         }
         
     except Exception as e:
@@ -359,18 +375,9 @@ def save_scraping_stats(results: List[Dict]):
         json.dump(stats, f, ensure_ascii=False, indent=2)
 
 def cleanup_old_files():
-    """Limpiar archivos antiguos"""
-    import glob
-    import time
-
-    # Limpiar archivos CSV y JSON antiguos (más de 7 días)
-    cutoff_time = time.time() - (7 * 24 * 60 * 60)
-    
-    for pattern in ['data/*.csv', 'data/*.json']:
-        for file_path in glob.glob(pattern):
-            if os.path.getmtime(file_path) < cutoff_time:
-                os.remove(file_path)
-                logger.info(f"Archivo eliminado: {file_path}")
+    """Limpiar archivos antiguos (DESHABILITADO - se mantienen todas las noticias)"""
+    logger.info("Limpieza de archivos de noticias DESHABILITADA - se mantienen todas las noticias")
+    # Ya no se eliminan archivos de noticias para mantener la mayor cantidad posible
 
 def cleanup_old_logs():
     """Limpiar logs antiguos"""
