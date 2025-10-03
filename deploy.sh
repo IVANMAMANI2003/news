@@ -245,14 +245,25 @@ sleep 10
 print_info "Verificando tareas programadas..."
 docker-compose exec celery-worker celery -A celery_tasks inspect scheduled
 
+# Si no hay tareas programadas, configurar manualmente
+if ! docker-compose exec celery-worker celery -A celery_tasks inspect scheduled | grep -q "scrape-news-every-hour"; then
+    print_info "Configurando tareas programadas manualmente..."
+    docker-compose exec celery-worker celery -A celery_tasks beat --detach
+    sleep 5
+fi
+
 # =============================================================================
 # 11. EJECUTAR SCRAPING INICIAL
 # =============================================================================
 print_header "11. EJECUTANDO SCRAPING INICIAL..."
 
-# Ejecutar scraping via Celery
-print_info "Ejecutando scraping via Celery..."
-docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping &
+# Ejecutar scraping via Celery en background
+print_info "Ejecutando scraping via Celery en background..."
+nohup docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping > /dev/null 2>&1 &
+
+# Programar scraping cada hora
+print_info "Programando scraping automático cada hora..."
+(crontab -l 2>/dev/null; echo "0 * * * * cd /opt/news-scraper && docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping > /dev/null 2>&1") | crontab -
 
 # Ejecutar scraping directo
 print_info "Ejecutando scraping directo..."
@@ -380,6 +391,29 @@ chmod +x $PROJECT_DIR/manage.sh
 
 # Crear enlaces simbólicos
 ln -sf $PROJECT_DIR/manage.sh /usr/local/bin/news-scraper
+
+# Crear script de inicio automático
+cat > /etc/systemd/system/news-scraper.service << EOF
+[Unit]
+Description=News Scraper Service
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=$PROJECT_DIR
+ExecStart=/usr/bin/docker-compose up -d
+ExecStop=/usr/bin/docker-compose down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Habilitar servicio
+systemctl daemon-reload
+systemctl enable news-scraper.service
 
 # =============================================================================
 # 14. CREAR SCRIPT DE ACTUALIZACIÓN
