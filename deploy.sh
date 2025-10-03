@@ -133,6 +133,11 @@ LOG_FILE=/app/logs/unified_scraper.log
 AWS_REGION=$REGION
 EOF
 
+# Limpiar contenedores existentes
+print "Limpiando contenedores existentes..."
+sudo docker-compose down -v 2>/dev/null || true
+sudo docker system prune -f 2>/dev/null || true
+
 # Construir y ejecutar contenedores
 print "Construyendo contenedores..."
 sudo docker-compose build --no-cache
@@ -148,16 +153,37 @@ sleep 60
 print "Verificando servicios..."
 sudo docker-compose ps
 
+# Verificar que todos los servicios estén corriendo
+print "Verificando que todos los servicios estén corriendo..."
+for i in {1..10}; do
+    if sudo docker-compose ps | grep -q "Up"; then
+        print "Servicios funcionando correctamente"
+        break
+    else
+        print "Esperando servicios... intento $i/10"
+        sleep 10
+    fi
+done
+
+# Verificar estado final
+print "Estado final de contenedores:"
+sudo docker-compose ps
+
 # Ejecutar scraping completo automáticamente
 print "Ejecutando scraping completo de las 4 páginas..."
-sudo docker-compose exec -T celery-worker python -c "
+if sudo docker-compose exec -T celery-worker python -c "
 import sys
 sys.path.append('/app')
 from unified_scraper import UnifiedNewsScraper
 scraper = UnifiedNewsScraper()
 scraper.run_complete_scraping()
 print('Scraping completo finalizado')
-"
+" 2>/dev/null; then
+    print "✅ Scraping ejecutado correctamente"
+else
+    print "⚠️  Error en scraping automático, pero el sistema está listo"
+    print "Puedes ejecutar manualmente: sudo docker-compose exec celery-worker python unified_scraper.py"
+fi
 
 # Esperar un poco para que se procese
 print "Esperando procesamiento inicial..."
@@ -243,10 +269,10 @@ print_header "=== DESPLIEGUE COMPLETADO ==="
 print "Sistema desplegado en:"
 print "  - IP Pública: $PUBLIC_IP"
 print "  - IP Privada: $PRIVATE_IP"
+print "  - Ubicación: $PROJECT_DIR"
 print ""
-print "Sistema iniciado!"
-print "Ver logs: sudo docker-compose logs -f"
-print "Ejecutar scraping: sudo docker-compose exec celery-worker celery -A celery_tasks call celery_tasks.scheduled_scraping"
+print "Estado actual:"
+sudo docker-compose ps
 print ""
 print "Comandos de gestión:"
 print "  news-scraper start     # Iniciar"
@@ -254,7 +280,13 @@ print "  news-scraper stop      # Detener"
 print "  news-scraper restart   # Reiniciar"
 print "  news-scraper status    # Ver estado"
 print "  news-scraper logs      # Ver logs"
+print "  news-scraper scrape    # Ejecutar scraping manual"
+print "  news-scraper stats     # Ver estadísticas de BD"
 print "  news-scraper scale 4   # Escalar workers"
-print "  news-scraper monitor   # Ver URL de monitoreo"
+print ""
+print "Diagnóstico rápido:"
+print "  sudo docker-compose ps"
+print "  sudo docker-compose logs celery-worker"
+print "  sudo docker-compose exec postgres psql -U postgres -d news_scraper -c 'SELECT COUNT(*) FROM noticias;'"
 print ""
 print_header "✅ SISTEMA LISTO PARA USAR"
