@@ -280,7 +280,7 @@ class UnifiedNewsScraper:
             # Ejecutar scraping según el tipo de scraper
             if hasattr(scraper, 'scrape_noticias'):
                 # Nuevos scrapers con método unificado
-                scraper.scrape_noticias(max_articles=50)
+                scraper.scrape_noticias()
                 noticias = scraper.news_data
             else:
                 self.logger.error(f"Scraper '{source_name}' no tiene método scrape_noticias")
@@ -403,11 +403,8 @@ class UnifiedNewsScraper:
                         self.stats['noticias_por_fuente'][source_name] = len(noticias)
                         self.stats['total_noticias'] += len(noticias)
                 
-                # Delay entre fuentes
-                delay = self.config['scraping']['delay_between_sources']
-                if delay > 0:
-                    self.logger.info(f"Esperando {delay} segundos antes de la siguiente fuente...")
-                    time.sleep(delay)
+                # Sin delay - máximo rendimiento
+                self.logger.info(f"Continuando con la siguiente fuente...")
             
             # Guardar archivo general con todas las noticias
             if all_noticias:

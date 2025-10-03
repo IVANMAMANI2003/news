@@ -623,7 +623,7 @@ class DiarioSinFronterasScraper:
             self.save_data()
             self.save_processed_urls()
 
-    def scrape_noticias(self, max_noticias=50):
+    def scrape_noticias(self, max_noticias=None):
         """Método principal para extraer noticias"""
         self.logger.info("Iniciando scraping de Diario Sin Fronteras")
         
@@ -634,8 +634,9 @@ class DiarioSinFronterasScraper:
         url_hashes = {hashlib.md5(url.encode()).hexdigest() for url in article_urls}
         new_urls = [url for url in article_urls if hashlib.md5(url.encode()).hexdigest() not in self.scraped_articles]
         
-        # Limitar a max_noticias
-        new_urls = new_urls[:max_noticias]
+        # Limitar a max_noticias si se especifica
+        if max_noticias is not None:
+            new_urls = new_urls[:max_noticias]
         
         self.logger.info(f"Procesando {len(new_urls)} noticias nuevas")
         

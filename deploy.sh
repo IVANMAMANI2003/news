@@ -148,17 +148,16 @@ sleep 60
 print "Verificando servicios..."
 sudo docker-compose ps
 
-# Ejecutar scraping inicial
-print "Ejecutando scraping inicial..."
+# Ejecutar scraping completo automáticamente
+print "Ejecutando scraping completo de las 4 páginas..."
 sudo docker-compose exec -T celery-worker python -c "
-from celery_tasks import scheduled_scraping
-scheduled_scraping.delay()
-print('Scraping iniciado en background')
+import sys
+sys.path.append('/app')
+from unified_scraper import UnifiedNewsScraper
+scraper = UnifiedNewsScraper()
+scraper.run_complete_scraping()
+print('Scraping completo finalizado')
 "
-
-# Comando alternativo si el anterior falla
-print "Ejecutando scraping alternativo..."
-sudo docker-compose exec -T celery-worker python unified_scraper.py
 
 # Esperar un poco para que se procese
 print "Esperando procesamiento inicial..."
@@ -205,8 +204,15 @@ case "$1" in
         echo "http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080/monitor"
         ;;
     scrape)
-        echo "Ejecutando scraping manual..."
-        sudo docker-compose exec celery-worker celery -A celery_tasks call celery_tasks.scheduled_scraping
+        echo "Ejecutando scraping completo de las 4 páginas..."
+        sudo docker-compose exec celery-worker python -c "
+import sys
+sys.path.append('/app')
+from unified_scraper import UnifiedNewsScraper
+scraper = UnifiedNewsScraper()
+scraper.run_complete_scraping()
+print('Scraping completo finalizado')
+"
         ;;
     stats)
         echo "Estadísticas de la base de datos:"

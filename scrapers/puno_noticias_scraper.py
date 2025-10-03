@@ -428,7 +428,7 @@ class PunoNoticiasScraper:
         self.logger.info("Ejecutando scraping incremental...")
         self.scrape_all_news()
 
-    def scrape_noticias(self, max_noticias=50):
+    def scrape_noticias(self, max_noticias=None):
         """Método principal para extraer noticias"""
         self.logger.info("Iniciando scraping de Puno Noticias")
         
@@ -438,8 +438,9 @@ class PunoNoticiasScraper:
         # Filtrar URLs ya scrapeadas
         new_urls = [url for url in all_news_urls if url not in self.scraped_urls]
         
-        # Limitar a max_noticias
-        new_urls = new_urls[:max_noticias]
+        # Limitar a max_noticias si se especifica
+        if max_noticias is not None:
+            new_urls = new_urls[:max_noticias]
         
         self.logger.info(f"Procesando {len(new_urls)} noticias nuevas")
         

@@ -464,7 +464,7 @@ class PachamamaRadioScraper:
         
         self.logger.info(f"Scraping incremental completado. Nuevas noticias: {nuevas_noticias}")
 
-    def scrape_noticias(self, max_noticias=50):
+    def scrape_noticias(self, max_noticias=None):
         """Método principal para extraer noticias"""
         self.logger.info("Iniciando scraping de Pachamama Radio")
         
@@ -472,7 +472,7 @@ class PachamamaRadioScraper:
         urls_visitadas = set()
         total_noticias = 0
         
-        while urls_por_procesar and total_noticias < max_noticias:
+        while urls_por_procesar and (max_noticias is None or total_noticias < max_noticias):
             url = urls_por_procesar.pop()
             
             if url in urls_visitadas:
