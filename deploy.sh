@@ -136,7 +136,13 @@ EOF
 # Limpiar contenedores existentes
 print "Limpiando contenedores existentes..."
 sudo docker-compose down -v 2>/dev/null || true
-sudo docker system prune -f 2>/dev/null || true
+sudo docker system prune -a -f 2>/dev/null || true
+sudo docker volume prune -f 2>/dev/null || true
+
+# Deshabilitar BuildKit (usar Docker clásico)
+print "Configurando Docker clásico (sin BuildKit)..."
+export DOCKER_BUILDKIT=0
+echo 'export DOCKER_BUILDKIT=0' >> ~/.bashrc
 
 # Construir y ejecutar contenedores
 print "Construyendo contenedores..."
@@ -168,6 +174,24 @@ done
 # Verificar estado final
 print "Estado final de contenedores:"
 sudo docker-compose ps
+
+# Configurar Celery Beat para tareas programadas
+print "Configurando tareas programadas de Celery Beat..."
+sudo docker-compose stop celery-beat 2>/dev/null || true
+sudo docker-compose exec redis redis-cli DEL celerybeat-schedule 2>/dev/null || true
+sudo docker-compose up -d celery-beat
+
+# Esperar a que Celery Beat se inicie
+print "Esperando a que Celery Beat se configure..."
+sleep 10
+
+# Verificar tareas programadas
+print "Verificando tareas programadas..."
+sudo docker-compose exec celery-worker celery -A celery_tasks inspect scheduled
+
+# Ejecutar scraping manual inmediato para probar
+print "Ejecutando scraping manual de prueba..."
+sudo docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping &
 
 # Ejecutar scraping completo automáticamente
 print "Ejecutando scraping completo de las 4 páginas..."
@@ -283,6 +307,11 @@ print "  news-scraper logs      # Ver logs"
 print "  news-scraper scrape    # Ejecutar scraping manual"
 print "  news-scraper stats     # Ver estadísticas de BD"
 print "  news-scraper scale 4   # Escalar workers"
+print ""
+print "Comandos de Celery:"
+print "  sudo docker-compose exec celery-worker celery -A celery_tasks inspect scheduled"
+print "  sudo docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping"
+print "  sudo docker-compose logs -f celery-beat"
 print ""
 print "Diagnóstico rápido:"
 print "  sudo docker-compose ps"
