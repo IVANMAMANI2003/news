@@ -1,10 +1,9 @@
 #!/bin/bash
 
 # =============================================================================
-# DEPLOY SCRIPT - SISTEMA DE SCRAPING DE NOTICIAS
+# DEPLOY SCRIPT SIMPLIFICADO - SISTEMA DE SCRAPING DE NOTICIAS
 # =============================================================================
-# Script para desplegar el sistema de scraping en AWS EC2
-# Incluye: Docker, PostgreSQL, Redis, Celery, Scraping automático
+# Script esencial para desplegar el sistema de scraping en AWS EC2
 # =============================================================================
 
 set -e  # Salir si hay errores
@@ -39,7 +38,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-print_header "=== DESPLIEGUE EN AWS - SISTEMA DE SCRAPING ==="
+print_header "=== DESPLIEGUE SIMPLIFICADO - SISTEMA DE SCRAPING ==="
 
 # Obtener información del sistema
 PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "localhost")
@@ -54,15 +53,15 @@ print_info "Región: $REGION"
 PROJECT_DIR="/opt/news-scraper"
 
 # =============================================================================
-# 1. ACTUALIZAR SISTEMA
+# 1. ACTUALIZAR SISTEMA E INSTALAR DEPENDENCIAS
 # =============================================================================
-print_header "1. ACTUALIZANDO SISTEMA..."
+print_header "1. ACTUALIZANDO SISTEMA E INSTALANDO DEPENDENCIAS..."
 
-apt-get update -y
-apt-get upgrade -y
+sudo apt-get update -y
+sudo apt-get upgrade -y
 
-# Instalar dependencias del sistema
-apt-get install -y \
+# Instalar dependencias esenciales
+sudo apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -72,7 +71,7 @@ apt-get install -y \
     git \
     unzip \
     htop \
-    tree
+    ufw
 
 # =============================================================================
 # 2. INSTALAR DOCKER
@@ -80,22 +79,22 @@ apt-get install -y \
 print_header "2. INSTALANDO DOCKER..."
 
 # Remover versiones anteriores
-apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+sudo apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
 
 # Agregar repositorio de Docker
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 # Instalar Docker
-apt-get update -y
-apt-get install -y docker-ce docker-ce-cli containerd.io
+sudo apt-get update -y
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io
 
 # Iniciar y habilitar Docker
-systemctl start docker
-systemctl enable docker
+sudo systemctl start docker
+sudo systemctl enable docker
 
 # Agregar usuario ubuntu al grupo docker
-usermod -aG docker ubuntu
+sudo usermod -aG docker ubuntu
 
 # =============================================================================
 # 3. INSTALAR DOCKER COMPOSE
@@ -104,11 +103,11 @@ print_header "3. INSTALANDO DOCKER COMPOSE..."
 
 # Descargar Docker Compose
 DOCKER_COMPOSE_VERSION="2.21.0"
-curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+sudo curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
 
 # Crear enlace simbólico
-ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
+sudo ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
 
 # =============================================================================
 # 4. CONFIGURAR FIREWALL
@@ -116,14 +115,14 @@ ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
 print_header "4. CONFIGURANDO FIREWALL..."
 
 # Habilitar UFW
-ufw --force enable
+sudo ufw --force enable
 
 # Reglas básicas
-ufw allow ssh
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw allow 6379/tcp  # Redis
-ufw allow 5432/tcp  # PostgreSQL
+sudo ufw allow ssh
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 6379/tcp  # Redis
+sudo ufw allow 5432/tcp  # PostgreSQL
 
 print_info "Firewall configurado"
 
@@ -133,27 +132,27 @@ print_info "Firewall configurado"
 print_header "5. PREPARANDO PROYECTO..."
 
 # Crear directorio
-mkdir -p $PROJECT_DIR
+sudo mkdir -p $PROJECT_DIR
 cd $PROJECT_DIR
 
 # Clonar repositorio si no existe
 if [ ! -d ".git" ]; then
     print_info "Clonando repositorio..."
-    git clone https://github.com/IVANMAMANI2003/news.git .
+    sudo git clone https://github.com/IVANMAMANI2003/news.git .
 else
     print_info "Actualizando repositorio..."
-    git pull origin main
+    sudo git pull origin main
 fi
 
 # Crear directorios necesarios
-mkdir -p data logs
+sudo mkdir -p data logs
 
 # =============================================================================
 # 6. CONFIGURAR VARIABLES DE ENTORNO
 # =============================================================================
 print_header "6. CONFIGURANDO VARIABLES DE ENTORNO..."
 
-cat > .env << EOF
+sudo tee .env > /dev/null << EOF
 # Base de datos
 DB_HOST=postgres
 DB_PORT=5432
@@ -177,13 +176,13 @@ print_header "7. CONFIGURANDO DOCKER..."
 
 # Deshabilitar BuildKit (usar Docker clásico)
 export DOCKER_BUILDKIT=0
-echo 'export DOCKER_BUILDKIT=0' >> ~/.bashrc
+echo 'export DOCKER_BUILDKIT=0' | sudo tee -a ~/.bashrc
 
 # Limpiar Docker completamente
 print_info "Limpiando Docker..."
-docker-compose down -v 2>/dev/null || true
-docker system prune -a -f
-docker volume prune -f
+sudo docker-compose down -v 2>/dev/null || true
+sudo docker system prune -a -f
+sudo docker volume prune -f
 
 # =============================================================================
 # 8. CONSTRUIR Y LEVANTAR SERVICIOS
@@ -192,11 +191,11 @@ print_header "8. CONSTRUYENDO Y LEVANTANDO SERVICIOS..."
 
 # Construir imágenes
 print_info "Construyendo imágenes..."
-docker-compose build --no-cache
+sudo docker-compose build --no-cache
 
 # Levantar servicios
 print_info "Levantando servicios..."
-docker-compose up -d
+sudo docker-compose up -d
 
 # =============================================================================
 # 9. VERIFICAR SERVICIOS
@@ -209,240 +208,93 @@ sleep 30
 
 # Verificar estado
 print_info "Estado de contenedores:"
-docker-compose ps
-
-# Verificar que todos estén corriendo
-print_info "Verificando que todos los servicios estén corriendo..."
-for i in {1..10}; do
-    if docker-compose ps | grep -q "Up"; then
-        print_info "✅ Servicios funcionando correctamente"
-        break
-    else
-        print_warning "Esperando servicios... intento $i/10"
-        sleep 10
-    fi
-done
+sudo docker-compose ps
 
 # =============================================================================
-# 10. CONFIGURAR CELERY BEAT
+# 10. EJECUTAR SCRAPING INICIAL COMPLETO INMEDIATAMENTE
 # =============================================================================
-print_header "10. CONFIGURANDO CELERY BEAT..."
+print_header "10. EJECUTANDO SCRAPING INICIAL COMPLETO INMEDIATAMENTE..."
+
+# Ejecutar scraping completo via Celery inmediatamente
+print_info "Ejecutando scraping completo via Celery..."
+sudo docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping
+
+# =============================================================================
+# 11. CONFIGURAR CELERY BEAT PARA NUEVAS NOTICIAS
+# =============================================================================
+print_header "11. CONFIGURANDO CELERY BEAT PARA NUEVAS NOTICIAS..."
 
 # Limpiar schedule persistente
 print_info "Limpiando schedule persistente..."
-docker-compose exec redis redis-cli DEL celerybeat-schedule 2>/dev/null || true
+sudo docker-compose exec redis redis-cli DEL celerybeat-schedule 2>/dev/null || true
 
-# Reiniciar Celery Beat si no está corriendo
-if ! docker-compose ps | grep -q "celery-beat.*Up"; then
-    print_info "Reiniciando Celery Beat..."
-    docker-compose up -d celery-beat
-fi
+# Reiniciar Celery Beat
+print_info "Reiniciando Celery Beat..."
+sudo docker-compose up -d celery-beat
 
 # Esperar a que se configure
 sleep 10
 
-# Verificar tareas programadas
-print_info "Verificando tareas programadas..."
-docker-compose exec celery-worker celery -A celery_tasks inspect scheduled
-
-# Si no hay tareas programadas, configurar manualmente
-if ! docker-compose exec celery-worker celery -A celery_tasks inspect scheduled | grep -q "scrape-news-every-hour"; then
-    print_info "Configurando tareas programadas manualmente..."
-    docker-compose exec celery-worker celery -A celery_tasks beat --detach
-    sleep 5
-fi
-
 # =============================================================================
-# 11. EJECUTAR SCRAPING INICIAL
+# 12. CREAR SCRIPT DE GESTIÓN SIMPLE
 # =============================================================================
-print_header "11. EJECUTANDO SCRAPING INICIAL..."
+print_header "12. CREANDO SCRIPT DE GESTIÓN..."
 
-# Ejecutar scraping via Celery en background
-print_info "Ejecutando scraping via Celery en background..."
-nohup docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping > /dev/null 2>&1 &
-
-# Programar scraping cada hora
-print_info "Programando scraping automático cada hora..."
-(crontab -l 2>/dev/null; echo "0 * * * * cd /opt/news-scraper && docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping > /dev/null 2>&1") | crontab -
-
-# Ejecutar scraping directo
-print_info "Ejecutando scraping directo..."
-if docker-compose exec -T celery-worker python -c "
-import sys
-sys.path.append('/app')
-from unified_scraper import UnifiedNewsScraper
-scraper = UnifiedNewsScraper()
-scraper.run_complete_scraping()
-print('Scraping completo finalizado')
-" 2>/dev/null; then
-    print_info "✅ Scraping ejecutado correctamente"
-else
-    print_warning "⚠️  Error en scraping automático, pero el sistema está listo"
-fi
-
-# =============================================================================
-# 12. VERIFICAR RESULTADOS
-# =============================================================================
-print_header "12. VERIFICANDO RESULTADOS..."
-
-# Esperar procesamiento
-print_info "Esperando procesamiento inicial..."
-sleep 30
-
-# Verificar contenedores
-print_info "Estado final de contenedores:"
-docker-compose ps
-
-# Verificar base de datos
-print_info "Verificando noticias en base de datos..."
-docker-compose exec -T postgres psql -U postgres -d news_scraper -c "SELECT COUNT(*) as total_noticias FROM noticias;"
-
-# =============================================================================
-# 13. CREAR SCRIPT DE GESTIÓN
-# =============================================================================
-print_header "13. CREANDO SCRIPT DE GESTIÓN..."
-
-cat > $PROJECT_DIR/manage.sh << 'EOF'
+sudo tee $PROJECT_DIR/manage.sh > /dev/null << 'EOF'
 #!/bin/bash
 cd /opt/news-scraper
 
 case "$1" in
     start)
         echo "Iniciando sistema..."
-        docker-compose up -d
+        sudo docker-compose up -d
         ;;
     stop)
         echo "Deteniendo sistema..."
-        docker-compose down
+        sudo docker-compose down
         ;;
     restart)
         echo "Reiniciando sistema..."
-        docker-compose restart
+        sudo docker-compose restart
         ;;
     status)
         echo "Estado del sistema:"
-        docker-compose ps
+        sudo docker-compose ps
         ;;
     logs)
         echo "Mostrando logs:"
-        docker-compose logs -f
-        ;;
-    worker-logs)
-        echo "Mostrando logs del worker:"
-        docker-compose logs -f celery-worker
-        ;;
-    beat-logs)
-        echo "Mostrando logs de Celery Beat:"
-        docker-compose logs -f celery-beat
+        sudo docker-compose logs -f
         ;;
     scrape)
         echo "Ejecutando scraping manual..."
-        docker-compose exec celery-worker python unified_scraper.py
-        ;;
-    celery-scrape)
-        echo "Ejecutando scraping via Celery..."
-        docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping
+        sudo docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping
         ;;
     stats)
         echo "Estadísticas de la base de datos:"
-        docker-compose exec postgres psql -U postgres -d news_scraper -c "SELECT fuente, COUNT(*) as noticias FROM noticias GROUP BY fuente;"
-        ;;
-    scheduled)
-        echo "Tareas programadas:"
-        docker-compose exec celery-worker celery -A celery_tasks inspect scheduled
-        ;;
-    active)
-        echo "Tareas activas:"
-        docker-compose exec celery-worker celery -A celery_tasks inspect active
-        ;;
-    scale)
-        WORKERS=${2:-2}
-        echo "Escalando workers a $WORKERS..."
-        docker-compose up -d --scale celery-worker=$WORKERS
-        ;;
-    clean)
-        echo "Limpiando Docker..."
-        docker-compose down -v
-        docker system prune -f
+        sudo docker-compose exec postgres psql -U postgres -d news_scraper -c "SELECT fuente, COUNT(*) as noticias FROM noticias GROUP BY fuente;"
         ;;
     *)
-        echo "Uso: $0 {start|stop|restart|status|logs|worker-logs|beat-logs|scrape|celery-scrape|stats|scheduled|active|scale|clean}"
+        echo "Uso: $0 {start|stop|restart|status|logs|scrape|stats}"
         echo ""
         echo "Comandos disponibles:"
-        echo "  start         - Iniciar sistema"
-        echo "  stop          - Detener sistema"
-        echo "  restart       - Reiniciar sistema"
-        echo "  status        - Ver estado"
-        echo "  logs          - Ver todos los logs"
-        echo "  worker-logs   - Ver logs del worker"
-        echo "  beat-logs     - Ver logs de Celery Beat"
-        echo "  scrape        - Ejecutar scraping manual"
-        echo "  celery-scrape - Ejecutar scraping via Celery"
-        echo "  stats         - Ver estadísticas de BD"
-        echo "  scheduled     - Ver tareas programadas"
-        echo "  active        - Ver tareas activas"
-        echo "  scale N       - Escalar workers"
-        echo "  clean         - Limpiar Docker"
+        echo "  start    - Iniciar sistema"
+        echo "  stop     - Detener sistema"
+        echo "  restart  - Reiniciar sistema"
+        echo "  status   - Ver estado"
+        echo "  logs     - Ver logs"
+        echo "  scrape   - Ejecutar scraping manual"
+        echo "  stats    - Ver estadísticas de BD"
         ;;
 esac
 EOF
 
-chmod +x $PROJECT_DIR/manage.sh
+sudo chmod +x $PROJECT_DIR/manage.sh
 
-# Crear enlaces simbólicos
-ln -sf $PROJECT_DIR/manage.sh /usr/local/bin/news-scraper
-
-# Crear script de inicio automático
-cat > /etc/systemd/system/news-scraper.service << EOF
-[Unit]
-Description=News Scraper Service
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=$PROJECT_DIR
-ExecStart=/usr/bin/docker-compose up -d
-ExecStop=/usr/bin/docker-compose down
-TimeoutStartSec=0
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Habilitar servicio
-systemctl daemon-reload
-systemctl enable news-scraper.service
+# Crear enlace simbólico
+sudo ln -sf $PROJECT_DIR/manage.sh /usr/local/bin/news-scraper
 
 # =============================================================================
-# 14. CREAR SCRIPT DE ACTUALIZACIÓN
-# =============================================================================
-print_header "14. CREANDO SCRIPT DE ACTUALIZACIÓN..."
-
-cat > $PROJECT_DIR/update.sh << 'EOF'
-#!/bin/bash
-cd /opt/news-scraper
-
-echo "Actualizando sistema de scraping..."
-git pull origin main
-
-echo "Reconstruyendo contenedores..."
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-
-echo "Verificando servicios..."
-docker-compose ps
-
-echo "✅ Sistema actualizado"
-EOF
-
-chmod +x $PROJECT_DIR/update.sh
-ln -sf $PROJECT_DIR/update.sh /usr/local/bin/news-update
-
-# =============================================================================
-# 15. MOSTRAR INFORMACIÓN FINAL
+# 13. MOSTRAR INFORMACIÓN FINAL
 # =============================================================================
 print_header "=== DESPLIEGUE COMPLETADO ==="
 
@@ -453,32 +305,20 @@ print_info "  - Ubicación: $PROJECT_DIR"
 
 echo ""
 print_info "Estado actual:"
-docker-compose ps
+sudo docker-compose ps
 
 echo ""
 print_info "Comandos de gestión:"
-print_info "  news-scraper start         # Iniciar sistema"
-print_info "  news-scraper stop          # Detener sistema"
-print_info "  news-scraper status        # Ver estado"
-print_info "  news-scraper logs          # Ver logs"
-print_info "  news-scraper worker-logs   # Ver logs del worker"
-print_info "  news-scraper beat-logs     # Ver logs de Celery Beat"
-print_info "  news-scraper scrape        # Ejecutar scraping manual"
-print_info "  news-scraper celery-scrape # Ejecutar scraping via Celery"
-print_info "  news-scraper stats         # Ver estadísticas de BD"
-print_info "  news-scraper scheduled     # Ver tareas programadas"
-print_info "  news-scraper active        # Ver tareas activas"
-print_info "  news-scraper scale 4       # Escalar workers"
-print_info "  news-scraper clean         # Limpiar Docker"
-print_info "  news-update                # Actualizar desde GitHub"
+print_info "  news-scraper start    # Iniciar sistema"
+print_info "  news-scraper stop     # Detener sistema"
+print_info "  news-scraper status   # Ver estado"
+print_info "  news-scraper logs     # Ver logs"
+print_info "  news-scraper scrape   # Ejecutar scraping manual"
+print_info "  news-scraper stats    # Ver estadísticas de BD"
 
 echo ""
-print_info "Diagnóstico rápido:"
-print_info "  docker-compose ps"
-print_info "  docker-compose logs celery-worker"
-print_info "  docker-compose exec postgres psql -U postgres -d news_scraper -c 'SELECT COUNT(*) FROM noticias;'"
+print_info "El scraping inicial completo ya se ejecutó inmediatamente"
+print_info "El scraping de nuevas noticias se ejecuta automáticamente cada hora via Celery Beat"
 
 echo ""
 print_header "✅ SISTEMA LISTO PARA USAR"
-print_info "El scraping se ejecuta automáticamente cada hora via Celery Beat"
-print_info "Puedes ejecutar scraping manual en cualquier momento con: news-scraper scrape"

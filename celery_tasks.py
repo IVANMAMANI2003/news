@@ -20,6 +20,7 @@ sys.path.append('codigos-claude/pachamama')
 sys.path.append('codigos-claude/puno-noticias')
 
 from database import DatabaseManager
+from unified_scraper import normalize_news_data, save_news_files
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -44,42 +45,36 @@ def scrape_source(self, source_name: str, source_config: Dict) -> Dict:
         noticias = []
         
         if source_name == 'pachamama':
-            from pachamama import PachamamaRadioScraper
+            from scrapers.pachamama_scraper import PachamamaRadioScraper
             scraper = PachamamaRadioScraper()
             
-            # Configurar para scraping rápido
-            scraper.delay = 1  # Reducir delay
-            scraper.scrape_recursivo(max_depth=3)  # Reducir profundidad
-            
-            # Cargar noticias del archivo JSON
-            if os.path.exists(scraper.json_file):
-                with open(scraper.json_file, 'r', encoding='utf-8') as f:
-                    noticias = json.load(f)
+            # Ejecutar scraping
+            scraper.scrape_noticias()
+            noticias = scraper.news_data
                     
         elif source_name == 'los_andes':
-            from los_andes import LosAndesScraper
+            from scrapers.los_andes_scraper import LosAndesScraper
             scraper = LosAndesScraper()
-            scraper.delay_between_requests = 1
-            scraper.max_workers = 10  # Aumentar workers
             
-            scraper.run_scraping()
+            # Ejecutar scraping
+            scraper.scrape_noticias()
             noticias = scraper.news_data
             
         elif source_name == 'puno_noticias':
-            from puno_noticias import PunoNoticiasScraper
+            from scrapers.puno_noticias_scraper import PunoNoticiasScraper
             scraper = PunoNoticiasScraper()
-            scraper.delay = 1
             
-            scraper.scrape_all_news()
+            # Ejecutar scraping
+            scraper.scrape_noticias()
             noticias = scraper.news_data
             
         elif source_name == 'diario_sin_fronteras':
-            from sin_fronteras import NewsScraper
-            scraper = SinFronterasScraper()
-            scraper.config['delay_between_requests'] = 1
-            scraper.config['max_workers'] = 10
+            from scrapers.diario_sin_fronteras_scraper import \
+                DiarioSinFronterasScraper
+            scraper = DiarioSinFronterasScraper()
             
-            scraper.run()
+            # Ejecutar scraping
+            scraper.scrape_noticias()
             noticias = scraper.news_data
         
         # Actualizar progreso
@@ -175,13 +170,35 @@ def save_to_database(noticias_data: List[Dict]) -> Dict:
         logger.error(f"Error guardando en base de datos: {e}")
         raise
 
+def save_scraping_stats(results):
+    """
+    Guardar estadísticas del scraping
+    """
+    try:
+        stats = {
+            'timestamp': datetime.now().isoformat(),
+            'total_sources': len(results),
+            'successful_sources': len([r for r in results if 'error' not in r]),
+            'failed_sources': len([r for r in results if 'error' in r]),
+            'results': results
+        }
+        
+        # Guardar en archivo JSON
+        with open('logs/scraping_stats.json', 'w', encoding='utf-8') as f:
+            json.dump(stats, f, indent=2, ensure_ascii=False)
+            
+        logger.info(f"Estadísticas guardadas: {stats['successful_sources']}/{stats['total_sources']} fuentes exitosas")
+        
+    except Exception as e:
+        logger.error(f"Error guardando estadísticas: {e}")
+
 @celery_app.task(name='news_scraper.tasks.scheduled_scraping')
 def scheduled_scraping():
     """
-    Tarea programada para hacer scraping de todas las fuentes
+    Tarea programada para hacer scraping completo inicial de todas las fuentes
     """
     try:
-        logger.info("Iniciando scraping programado")
+        logger.info("Iniciando scraping completo inicial")
         
         # Lista de fuentes
         sources = [
@@ -191,22 +208,19 @@ def scheduled_scraping():
             {'name': 'diario_sin_fronteras', 'enabled': True}
         ]
         
-        # Ejecutar scraping en paralelo
-        tasks = []
+        # Ejecutar scraping secuencial (una fuente a la vez)
+        results = []
         for source in sources:
             if source['enabled']:
-                task = scrape_source.delay(source['name'], {})
-                tasks.append(task)
-        
-        # Esperar resultados
-        results = []
-        for task in tasks:
-            try:
-                result = task.get(timeout=600)  # 10 minutos timeout
-                results.append(result)
-            except Exception as e:
-                logger.error(f"Error en tarea: {e}")
-                results.append({'error': str(e)})
+                try:
+                    logger.info(f"Procesando fuente completa: {source['name']}")
+                    result = scrape_source.delay(source['name'], {})
+                    result_data = result.get(timeout=600)  # 10 minutos timeout
+                    results.append(result_data)
+                    logger.info(f"Completado: {source['name']}")
+                except Exception as e:
+                    logger.error(f"Error en fuente {source['name']}: {e}")
+                    results.append({'error': str(e), 'source': source['name']})
         
         # Guardar estadísticas
         save_scraping_stats(results)
@@ -214,11 +228,56 @@ def scheduled_scraping():
         return {
             'sources_processed': len(results),
             'results': results,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'type': 'complete_initial'
         }
         
     except Exception as e:
-        logger.error(f"Error en scraping programado: {e}")
+        logger.error(f"Error en scraping completo inicial: {e}")
+        raise
+
+@celery_app.task(name='news_scraper.tasks.scrape_new_news')
+def scrape_new_news():
+    """
+    Tarea para hacer scraping solo de nuevas noticias (cada hora)
+    """
+    try:
+        logger.info("Iniciando scraping de nuevas noticias")
+        
+        # Lista de fuentes
+        sources = [
+            {'name': 'pachamama', 'enabled': True},
+            {'name': 'los_andes', 'enabled': True},
+            {'name': 'puno_noticias', 'enabled': True},
+            {'name': 'diario_sin_fronteras', 'enabled': True}
+        ]
+        
+        # Ejecutar scraping secuencial (una fuente a la vez)
+        results = []
+        for source in sources:
+            if source['enabled']:
+                try:
+                    logger.info(f"Procesando nuevas noticias de: {source['name']}")
+                    result = scrape_source.delay(source['name'], {})
+                    result_data = result.get(timeout=300)  # 5 minutos timeout para nuevas noticias
+                    results.append(result_data)
+                    logger.info(f"Completado: {source['name']}")
+                except Exception as e:
+                    logger.error(f"Error en fuente {source['name']}: {e}")
+                    results.append({'error': str(e), 'source': source['name']})
+        
+        # Guardar estadísticas
+        save_scraping_stats(results)
+        
+        return {
+            'sources_processed': len(results),
+            'results': results,
+            'timestamp': datetime.now().isoformat(),
+            'type': 'new_news'
+        }
+        
+    except Exception as e:
+        logger.error(f"Error en scraping de nuevas noticias: {e}")
         raise
 
 @celery_app.task(name='news_scraper.tasks.cleanup_old_data')

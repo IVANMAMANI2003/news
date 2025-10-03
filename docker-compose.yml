@@ -81,7 +81,7 @@ services:
       - ./logs:/app/logs
       - ./codigos-claude:/app/codigos-claude
     restart: unless-stopped
-    command: ["celery", "-A", "celery_tasks", "worker", "--loglevel=info", "--concurrency=4", "--queues=scraping,processing,database"]
+    command: ["celery", "-A", "celery_tasks", "worker", "--loglevel=info", "--concurrency=1", "--queues=scraping"]
 
   # Beat scheduler de Celery
   celery-beat:

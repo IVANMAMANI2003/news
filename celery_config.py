@@ -28,10 +28,11 @@ celery_app.conf.update(
     timezone='America/Lima',
     enable_utc=True,
     
-    # Configuración de workers
+    # Configuración de workers - Solo una tarea a la vez
     worker_prefetch_multiplier=1,
     task_acks_late=True,
     worker_max_tasks_per_child=1000,
+    worker_concurrency=1,  # Solo un worker para evitar conflictos
     
     # Configuración de timeouts
     task_soft_time_limit=300,  # 5 minutos
@@ -90,11 +91,6 @@ celery_app.conf.beat_schedule = {
         'task': 'news_scraper.tasks.scheduled_scraping',
         'schedule': 3600.0,  # Cada hora
         'options': {'queue': 'scraping'}
-    },
-    'cleanup-old-data': {
-        'task': 'news_scraper.tasks.cleanup_old_data',
-        'schedule': 86400.0,  # Cada día
-        'options': {'queue': 'processing'}
     },
 }
 

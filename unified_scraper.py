@@ -553,5 +553,121 @@ def main():
     else:
         print("Opción no válida")
 
+def save_news_files(noticias: List[Dict], source: str) -> None:
+    """Guardar noticias en archivos CSV y JSON"""
+    try:
+        # Crear directorio data si no existe
+        os.makedirs('data', exist_ok=True)
+        
+        # Guardar CSV
+        csv_file = f'data/noticias_{source}.csv'
+        if noticias:
+            with open(csv_file, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=noticias[0].keys())
+                writer.writeheader()
+                writer.writerows(noticias)
+        
+        # Guardar JSON
+        json_file = f'data/noticias_{source}.json'
+        with open(json_file, 'w', encoding='utf-8') as f:
+            json.dump(noticias, f, indent=2, ensure_ascii=False)
+            
+    except Exception as e:
+        print(f"Error guardando archivos para {source}: {e}")
+
+def normalize_news_data(raw_data: Dict, source: str) -> Dict:
+    """Función independiente para normalizar datos de noticias"""
+    # Mapear campos comunes
+    normalized = {
+        'titulo': raw_data.get('titulo', ''),
+        'fecha': normalize_date(raw_data.get('fecha', '')),
+        'hora': normalize_time(raw_data.get('hora', '')),
+        'resumen': raw_data.get('resumen', ''),
+        'contenido': raw_data.get('contenido', ''),
+        'categoria': raw_data.get('categoria', ''),
+        'autor': raw_data.get('autor', ''),
+        'tags': normalize_tags(raw_data.get('tags', '')),
+        'url': raw_data.get('url', ''),
+        'link_imagenes': normalize_images(raw_data.get('link_imagenes', [])),
+        'fuente': source,
+        'fecha_extraccion': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    
+    return normalized
+
+def normalize_date(date_str: str) -> str:
+    """Normalizar formato de fecha"""
+    if not date_str:
+        return datetime.now().strftime('%Y-%m-%d')
+    
+    try:
+        # Intentar diferentes formatos de fecha
+        formats = [
+            '%Y-%m-%d',
+            '%d/%m/%Y',
+            '%d-%m-%Y',
+            '%Y/%m/%d',
+            '%d/%m/%y',
+            '%d-%m-%y'
+        ]
+        
+        for fmt in formats:
+            try:
+                date_obj = datetime.strptime(date_str, fmt)
+                return date_obj.strftime('%Y-%m-%d')
+            except ValueError:
+                continue
+        
+        # Si no coincide con ningún formato, usar fecha actual
+        return datetime.now().strftime('%Y-%m-%d')
+        
+    except Exception:
+        return datetime.now().strftime('%Y-%m-%d')
+
+def normalize_time(time_str: str) -> str:
+    """Normalizar formato de hora"""
+    if not time_str:
+        return datetime.now().strftime('%H:%M:%S')
+    
+    try:
+        # Intentar diferentes formatos de hora
+        formats = [
+            '%H:%M:%S',
+            '%H:%M',
+            '%I:%M %p',
+            '%I:%M:%S %p'
+        ]
+        
+        for fmt in formats:
+            try:
+                time_obj = datetime.strptime(time_str, fmt)
+                return time_obj.strftime('%H:%M:%S')
+            except ValueError:
+                continue
+        
+        # Si no coincide con ningún formato, usar hora actual
+        return datetime.now().strftime('%H:%M:%S')
+        
+    except Exception:
+        return datetime.now().strftime('%H:%M:%S')
+
+def normalize_tags(tags) -> str:
+    """Normalizar tags"""
+    if isinstance(tags, list):
+        return ', '.join(tags)
+    elif isinstance(tags, str):
+        return tags
+    else:
+        return ''
+
+def normalize_images(images) -> str:
+    """Normalizar enlaces de imágenes"""
+    if isinstance(images, list):
+        return ', '.join(images)
+    elif isinstance(images, str):
+        return images
+    else:
+        return ''
+
 if __name__ == "__main__":
     main()
