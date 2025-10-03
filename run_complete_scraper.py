@@ -30,27 +30,27 @@ def run_individual_scrapers():
     print("🚀 EJECUTANDO SCRAPERS INDIVIDUALES")
     print("=" * 50)
     
-    # Lista de scrapers disponibles
+    # Lista de scrapers disponibles (nuevos)
     scrapers = [
         {
             'name': 'pachamama',
-            'file': 'codigos-claude/pachamama/pachamama.py',
+            'file': 'scrapers/pachamama_scraper.py',
             'class': 'PachamamaRadioScraper'
         },
         {
             'name': 'los_andes', 
-            'file': 'codigos-claude/los-andes/los-andes.py',
+            'file': 'scrapers/los_andes_scraper.py',
             'class': 'LosAndesScraper'
         },
         {
             'name': 'puno_noticias',
-            'file': 'codigos-claude/puno-noticias/puno-noticias.py', 
+            'file': 'scrapers/puno_noticias_scraper.py', 
             'class': 'PunoNoticiasScraper'
         },
         {
             'name': 'diario_sin_fronteras',
-            'file': 'codigos-claude/diario-sinfronteras/sin-fronteras.py',
-            'class': 'NewsScraper'
+            'file': 'scrapers/diario_sin_fronteras_scraper.py',
+            'class': 'DiarioSinFronterasScraper'
         }
     ]
     
@@ -69,33 +69,34 @@ def run_individual_scrapers():
             sys.path.append(os.path.dirname(scraper_info['file']))
             
             if scraper_info['name'] == 'pachamama':
-                from pachamama import PachamamaRadioScraper
+                from scrapers.pachamama_scraper import PachamamaRadioScraper
                 scraper = PachamamaRadioScraper()
-                scraper.scrape_recursivo(max_depth=5)  # Reducir profundidad para prueba
+                scraper.scrape_noticias(max_noticias=50)
                 
                 # Cargar noticias a BD
-                noticias = load_noticias_from_file(f"noticias_{scraper_info['name']}.json", scraper_info['name'])
+                noticias = load_noticias_from_scraper(scraper, scraper_info['name'])
                 
             elif scraper_info['name'] == 'los_andes':
-                from los_andes import LosAndesScraper
+                from scrapers.los_andes_scraper import LosAndesScraper
                 scraper = LosAndesScraper()
-                scraper.run_scraping()
+                scraper.scrape_noticias(max_noticias=50)
                 
                 # Cargar noticias a BD
                 noticias = load_noticias_from_scraper(scraper, scraper_info['name'])
                 
             elif scraper_info['name'] == 'puno_noticias':
-                from puno_noticias import PunoNoticiasScraper
+                from scrapers.puno_noticias_scraper import PunoNoticiasScraper
                 scraper = PunoNoticiasScraper()
-                scraper.scrape_all_news()
+                scraper.scrape_noticias(max_noticias=50)
                 
                 # Cargar noticias a BD
                 noticias = load_noticias_from_scraper(scraper, scraper_info['name'])
                 
             elif scraper_info['name'] == 'diario_sin_fronteras':
-                from sin_fronteras import NewsScraper
-                scraper = NewsScraper()
-                scraper.run()
+                from scrapers.diario_sin_fronteras_scraper import \
+                    DiarioSinFronterasScraper
+                scraper = DiarioSinFronterasScraper()
+                scraper.scrape_noticias(max_noticias=50)
                 
                 # Cargar noticias a BD
                 noticias = load_noticias_from_scraper(scraper, scraper_info['name'])

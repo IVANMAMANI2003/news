@@ -148,6 +148,26 @@ sleep 60
 print "Verificando servicios..."
 sudo docker-compose ps
 
+# Ejecutar scraping inicial
+print "Ejecutando scraping inicial..."
+sudo docker-compose exec -T celery-worker python -c "
+from celery_tasks import scheduled_scraping
+scheduled_scraping.delay()
+print('Scraping iniciado en background')
+"
+
+# Comando alternativo si el anterior falla
+print "Ejecutando scraping alternativo..."
+sudo docker-compose exec -T celery-worker python unified_scraper.py
+
+# Esperar un poco para que se procese
+print "Esperando procesamiento inicial..."
+sleep 60
+
+# Verificar que se hayan procesado noticias
+print "Verificando noticias en base de datos..."
+sudo docker-compose exec -T postgres psql -U postgres -d news_scraper -c "SELECT COUNT(*) as total_noticias FROM noticias;"
+
 # Crear script de gestión
 print "Creando script de gestión..."
 cat > $PROJECT_DIR/manage.sh << 'EOF'
@@ -184,8 +204,16 @@ case "$1" in
         echo "Monitoreo disponible en:"
         echo "http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080/monitor"
         ;;
+    scrape)
+        echo "Ejecutando scraping manual..."
+        sudo docker-compose exec celery-worker celery -A celery_tasks call celery_tasks.scheduled_scraping
+        ;;
+    stats)
+        echo "Estadísticas de la base de datos:"
+        sudo docker-compose exec postgres psql -U postgres -d news_scraper -c "SELECT fuente, COUNT(*) as noticias FROM noticias GROUP BY fuente;"
+        ;;
     *)
-        echo "Uso: $0 {start|stop|restart|status|logs|scale|monitor}"
+        echo "Uso: $0 {start|stop|restart|status|logs|scale|monitor|scrape|stats}"
         echo "  start    - Iniciar sistema"
         echo "  stop     - Detener sistema"
         echo "  restart  - Reiniciar sistema"
@@ -193,8 +221,10 @@ case "$1" in
         echo "  logs     - Ver logs"
         echo "  scale N  - Escalar workers"
         echo "  monitor  - Ver URL de monitoreo"
+        echo "  scrape   - Ejecutar scraping manual"
+        echo "  stats    - Ver estadísticas"
         ;;
-esac
+    esac
 EOF
 
 chmod +x $PROJECT_DIR/manage.sh
