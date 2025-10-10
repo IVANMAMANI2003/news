@@ -48,7 +48,7 @@ class Config:
         'puno_noticias': {
             'enabled': os.getenv('SOURCE_PUNO_NOTICIAS', 'true').lower() == 'true',
             'base_url': 'https://punonoticias.pe/',
-            'delay': int(os.getenv('SOURCE_PUNO_NOTICIAS_DELAY', 1))
+            'delay': int(os.getenv('SOURCE_PUNO_NOTICIAS_DELAY', 2))
         },
         'los_andes': {
             'enabled': os.getenv('SOURCE_LOS_ANDES', 'true').lower() == 'true',
@@ -60,7 +60,7 @@ class Config:
         'diario_sin_fronteras': {
             'enabled': os.getenv('SOURCE_SIN_FRONTERAS', 'true').lower() == 'true',
             'base_url': 'https://diariosinfronteras.com.pe/',
-            'delay': int(os.getenv('SOURCE_SIN_FRONTERAS_DELAY', 1))
+            'delay': int(os.getenv('SOURCE_SIN_FRONTERAS_DELAY', 2))
         }
     }
     
