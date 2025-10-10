@@ -18,7 +18,6 @@ class PachamamaRadioScraper:
         self.base_url = base_url
         self.delay = delay
         self.session = requests.Session()
-        self.news_data = []  # Inicializar lista de noticias
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -49,6 +48,9 @@ class PachamamaRadioScraper:
         
         # Inicializar archivos si no existen
         self.inicializar_archivos()
+        
+        # Lista de noticias en memoria
+        self.news_data = []
 
     def cargar_urls_procesadas(self) -> Set[str]:
         """Carga las URLs ya procesadas para evitar duplicados"""
@@ -79,7 +81,7 @@ class PachamamaRadioScraper:
                 json.dump([], f, ensure_ascii=False, indent=2)
 
     def hacer_request(self, url: str) -> BeautifulSoup:
-        """Realiza una petición HTTP con manejo de errores (copiado de codigos-claude)"""
+        """Realiza una petición HTTP con manejo de errores"""
         try:
             response = self.session.get(url, timeout=30)
             response.raise_for_status()
@@ -280,39 +282,16 @@ class PachamamaRadioScraper:
         """Encuentra todos los enlaces a noticias"""
         enlaces = set()
         
-        # Selectores para enlaces de noticias (como en codigos-claude)
+        # Selectores para enlaces de noticias
         selectores_enlaces = [
             'a[href*="/noticia"]', 'a[href*="/post"]', 'a[href*="/article"]',
             '.entry-title a', '.post-title a', '.article-title a',
             'article a', '.blog-post a', '.news-item a',
-            'a[href*="' + urlparse(base_url).netloc + '"]',
-            # Selectores adicionales para investigar
-            'a[href]',  # Todos los enlaces
-            'a[href*="/20"]',  # URLs con años
-            'a[href*="/202"]',  # URLs con años completos
+            'a[href*="' + urlparse(base_url).netloc + '"]'
         ]
-        
-        self.logger.info(f"Buscando enlaces en {base_url}")
-        
-        # Mostrar estructura HTML básica para investigar
-        self.logger.info("Estructura HTML básica:")
-        self.logger.info(f"  - Título de la página: {soup.title.get_text().strip() if soup.title else 'No encontrado'}")
-        self.logger.info(f"  - Total de elementos <a>: {len(soup.find_all('a'))}")
-        self.logger.info(f"  - Total de elementos <article>: {len(soup.find_all('article'))}")
-        self.logger.info(f"  - Total de elementos <div>: {len(soup.find_all('div'))}")
         
         for selector in selectores_enlaces:
             links = soup.select(selector)
-            self.logger.info(f"Selector '{selector}' encontró {len(links)} enlaces")
-            
-            # Mostrar algunos enlaces para investigar
-            if len(links) > 0 and selector == 'a[href]':
-                self.logger.info("Primeros 10 enlaces encontrados:")
-                for i, link in enumerate(links[:10]):
-                    href = link.get('href')
-                    text = link.get_text().strip()[:50]
-                    self.logger.info(f"  {i+1}. {href} - '{text}'")
-            
             for link in links:
                 href = link.get('href')
                 if href:
@@ -331,9 +310,7 @@ class PachamamaRadioScraper:
                             '.jpg', '.png', '.gif', '.pdf', '.doc'
                         ]):
                             enlaces.add(href)
-                            self.logger.info(f"Enlace agregado: {href}")
         
-        self.logger.info(f"Total de enlaces encontrados: {len(enlaces)}")
         return enlaces
 
     def encontrar_paginas_navegacion(self, soup: BeautifulSoup, base_url: str) -> Set[str]:
@@ -381,7 +358,7 @@ class PachamamaRadioScraper:
         with open(self.json_file, 'w', encoding='utf-8') as f:
             json.dump(noticias, f, ensure_ascii=False, indent=2)
 
-    def scrape_recursivo(self, max_depth=10):
+    def scrape_recursivo(self, max_depth=15):
         """Ejecuta scraping recursivo completo"""
         self.logger.info("Iniciando scraping recursivo de Pachamama Radio")
         
@@ -422,15 +399,10 @@ class PachamamaRadioScraper:
                 enlaces_noticias = self.encontrar_enlaces_noticias(soup, url)
                 enlaces_paginas = self.encontrar_paginas_navegacion(soup, url)
                 
-                self.logger.info(f"Enlaces de noticias encontrados: {len(enlaces_noticias)}")
-                self.logger.info(f"Enlaces de páginas encontrados: {len(enlaces_paginas)}")
-                
                 # Añadir enlaces no visitados
                 for enlace in enlaces_noticias | enlaces_paginas:
                     if enlace not in urls_visitadas and enlace not in self.urls_procesadas:
                         urls_por_procesar.add(enlace)
-                
-                self.logger.info(f"URLs agregadas para siguiente nivel: {len(urls_por_procesar)}")
                 
                 # Delay entre peticiones
                 time.sleep(self.delay)
@@ -498,7 +470,7 @@ class PachamamaRadioScraper:
         self.logger.info(f"Scraping incremental completado. Nuevas noticias: {nuevas_noticias}")
 
     def scrape_noticias(self, max_noticias=None):
-        """Método principal para extraer noticias"""
+        """Método principal para extraer noticias (compatible con celery_tasks)"""
         self.logger.info("Iniciando scraping de Pachamama Radio")
         
         urls_por_procesar = {self.base_url}

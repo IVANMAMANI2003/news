@@ -28,11 +28,11 @@ celery_app.conf.update(
     timezone='America/Lima',
     enable_utc=True,
     
-    # Configuración de workers - Solo una tarea a la vez
-    worker_prefetch_multiplier=1,
+    # Configuración de workers - Sin limitaciones
+    worker_prefetch_multiplier=10,  # Más tareas en paralelo
     task_acks_late=True,
-    worker_max_tasks_per_child=1000,
-    worker_concurrency=1,  # Solo un worker para evitar conflictos
+    worker_max_tasks_per_child=10000,  # Más tareas por worker
+    worker_concurrency=4,  # Más workers para mayor velocidad
     
     
     # Configuración de reintentos

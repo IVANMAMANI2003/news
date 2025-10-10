@@ -121,12 +121,10 @@ class LosAndesScraper:
                 
                 article_urls.update(page_articles)
                 logger.info(f"Encontrados {len(page_articles)} artículos en página {page}")
-                logger.info(f"Total acumulado: {len(article_urls)} artículos")
                 
                 page += 1
                 time.sleep(self.delay_between_requests)
                 
-                # Límite de páginas por seguridad (ajustar según necesidad)
                 # Sin límite de páginas - explorar todo
                 # if page > 100:
                 #     logger.warning(f"Límite de páginas alcanzado para {section}")
@@ -310,7 +308,6 @@ class LosAndesScraper:
             self.scraped_urls.add(url)
             self.new_articles_count += 1
             
-            logger.info(f"Artículo extraído: {article_data['titulo'][:50]}...")
             return article_data
             
         except Exception as e:
@@ -319,296 +316,186 @@ class LosAndesScraper:
     
     def extract_title(self, soup):
         """Extrae el título del artículo"""
-        selectors = [
-            'h1.entry-title',
-            'h1.post-title', 
-            'h1.article-title',
-            'h1',
-            '.title h1',
-            '.post-title',
-            'title'
+        title_selectors = [
+            'h1.entry-title', 'h1.post-title', 'h1', '.entry-title', '.post-title', 'title'
         ]
         
-        for selector in selectors:
+        for selector in title_selectors:
             element = soup.select_one(selector)
             if element:
                 return element.get_text().strip()
         
-        return "Sin título"
+        return ""
     
     def extract_date(self, soup):
         """Extrae la fecha del artículo"""
-        # Buscar en meta tags
-        date_meta = soup.find('meta', {'property': 'article:published_time'}) or \
-                   soup.find('meta', {'name': 'publishdate'}) or \
-                   soup.find('meta', {'name': 'date'})
-        
-        if date_meta:
-            date_str = date_meta.get('content', '')
-            if date_str:
-                try:
-                    # Parsear fecha ISO
-                    date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                    return date_obj.strftime('%Y-%m-%d')
-                except:
-                    pass
-        
-        # Buscar en el contenido
-        selectors = [
-            '.entry-date',
-            '.post-date',
-            '.date',
-            '.published',
-            '.article-date',
-            'time'
+        date_selectors = [
+            '.entry-date', '.post-date', '.date', '.published',
+            'time[datetime]', '.entry-meta time', '.post-meta .date',
+            '[class*="date"]', '[class*="time"]'
         ]
         
-        for selector in selectors:
+        for selector in date_selectors:
             element = soup.select_one(selector)
             if element:
-                date_text = element.get_text().strip()
-                # Extraer fecha con regex
-                date_match = re.search(r'(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})', date_text)
-                if date_match:
-                    day, month, year = date_match.groups()
-                    return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                if element.get('datetime'):
+                    date_text = element['datetime']
+                else:
+                    date_text = element.get_text().strip()
+                
+                if date_text:
+                    # Extraer solo la fecha
+                    match = re.search(r'\d{1,2}[-/]\d{1,2}[-/]\d{4}|\d{4}[-/]\d{1,2}[-/]\d{1,2}', date_text)
+                    if match:
+                        return match.group()
         
-        return datetime.now().strftime('%Y-%m-%d')
+        return ""
     
     def extract_time(self, soup):
         """Extrae la hora del artículo"""
-        time_element = soup.find('time')
-        if time_element:
-            datetime_str = time_element.get('datetime', '')
-            if datetime_str:
-                try:
-                    date_obj = datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
-                    return date_obj.strftime('%H:%M:%S')
-                except:
-                    pass
+        time_selectors = [
+            '.entry-date', '.post-date', '.date', '.published',
+            'time[datetime]', '.entry-meta time', '.post-meta .date',
+            '[class*="date"]', '[class*="time"]'
+        ]
         
-        # Buscar hora en el texto
-        selectors = ['.entry-time', '.post-time', '.time']
-        for selector in selectors:
+        for selector in time_selectors:
             element = soup.select_one(selector)
             if element:
-                time_text = element.get_text().strip()
-                time_match = re.search(r'(\d{1,2}):(\d{2})', time_text)
-                if time_match:
-                    return f"{time_match.group(1).zfill(2)}:{time_match.group(2)}:00"
+                if element.get('datetime'):
+                    time_text = element['datetime']
+                else:
+                    time_text = element.get_text().strip()
+                
+                if time_text:
+                    # Extraer solo la hora
+                    match = re.search(r'\d{1,2}:\d{2}(?::\d{2})?', time_text)
+                    if match:
+                        return match.group()
         
-        return "00:00:00"
+        return ""
     
     def extract_summary(self, soup):
         """Extrae el resumen del artículo"""
-        # Buscar en meta description
-        meta_desc = soup.find('meta', {'name': 'description'}) or \
-                   soup.find('meta', {'property': 'og:description'})
+        summary_selectors = ['.entry-excerpt', '.post-excerpt', '.excerpt', '.summary']
         
-        if meta_desc:
-            return meta_desc.get('content', '').strip()
-        
-        # Buscar en el contenido
-        selectors = [
-            '.entry-excerpt',
-            '.post-excerpt', 
-            '.summary',
-            '.excerpt',
-            '.lead'
-        ]
-        
-        for selector in selectors:
+        for selector in summary_selectors:
             element = soup.select_one(selector)
             if element:
                 return element.get_text().strip()
         
-        # Tomar los primeros párrafos del contenido
-        content_element = soup.select_one('.entry-content, .post-content, .content, .article-content')
-        if content_element:
-            paragraphs = content_element.find_all('p')
-            if paragraphs:
-                summary = paragraphs[0].get_text().strip()
-                return summary[:300] + "..." if len(summary) > 300 else summary
-        
-        return "Sin resumen disponible"
+        return ""
     
     def extract_content(self, soup):
-        """Extrae el contenido completo del artículo"""
-        selectors = [
-            '.entry-content',
-            '.post-content',
-            '.article-content',
-            '.content',
-            '.post-body',
-            '.entry-body'
+        """Extrae el contenido del artículo"""
+        content_selectors = [
+            '.entry-content', '.post-content', '.article-content',
+            '.content', 'article .content', '.post-body', '.entry-body'
         ]
         
-        for selector in selectors:
+        for selector in content_selectors:
             element = soup.select_one(selector)
             if element:
-                # Limpiar scripts y elementos no deseados
-                for unwanted in element.find_all(['script', 'style', 'ads', '.advertisement']):
-                    unwanted.decompose()
-                
-                # Extraer texto limpio
-                paragraphs = element.find_all(['p', 'div', 'span'])
-                content_parts = []
-                
-                for p in paragraphs:
-                    text = p.get_text().strip()
-                    if text and len(text) > 20:  # Filtrar texto muy corto
-                        content_parts.append(text)
-                
-                return '\n\n'.join(content_parts)
+                return element.get_text().strip()
         
-        return "Contenido no disponible"
+        return ""
     
     def extract_category(self, soup, url):
         """Extrae la categoría del artículo"""
-        # Buscar en breadcrumbs
-        breadcrumbs = soup.select('.breadcrumb a, .breadcrumbs a')
-        if breadcrumbs and len(breadcrumbs) > 1:
-            return breadcrumbs[-2].get_text().strip()
+        category_selectors = ['.category', '.post-category', '.entry-category', '.categories']
         
-        # Buscar en meta
-        category_meta = soup.find('meta', {'property': 'article:section'})
-        if category_meta:
-            return category_meta.get('content', '').strip()
+        for selector in category_selectors:
+            element = soup.select_one(selector)
+            if element:
+                return element.get_text().strip()
         
-        # Extraer de la URL
-        path_parts = urlparse(url).path.strip('/').split('/')
-        if 'categoria' in path_parts:
-            idx = path_parts.index('categoria')
-            if idx + 1 < len(path_parts):
-                return path_parts[idx + 1].replace('-', ' ').title()
+        # Intentar extraer de la URL
+        if '/categoria/' in url:
+            parts = url.split('/categoria/')
+            if len(parts) > 1:
+                category = parts[1].split('/')[0]
+                return category.replace('-', ' ').title()
         
-        # Buscar en clases o elementos específicos
-        category_element = soup.select_one('.category, .post-category, .article-category')
-        if category_element:
-            return category_element.get_text().strip()
-        
-        return "Sin categoría"
+        return ""
     
     def extract_author(self, soup):
         """Extrae el autor del artículo"""
-        # Buscar en meta tags
-        author_meta = soup.find('meta', {'name': 'author'}) or \
-                     soup.find('meta', {'property': 'article:author'})
+        author_selectors = ['.author', '.post-author', '.entry-author', '.by-author', '[rel="author"]']
         
-        if author_meta:
-            return author_meta.get('content', '').strip()
-        
-        # Buscar en elementos específicos
-        selectors = [
-            '.author',
-            '.post-author',
-            '.article-author', 
-            '.byline',
-            '.author-name',
-            '.by-author'
-        ]
-        
-        for selector in selectors:
+        for selector in author_selectors:
             element = soup.select_one(selector)
             if element:
-                author_text = element.get_text().strip()
-                # Limpiar texto del autor
-                author_text = re.sub(r'^(por|by|autor:?)\s*', '', author_text, flags=re.IGNORECASE)
-                return author_text
+                return element.get_text().strip()
         
-        return "Autor desconocido"
+        return ""
     
     def extract_tags(self, soup):
-        """Extrae los tags del artículo"""
-        tags = []
+        """Extrae las etiquetas del artículo"""
+        tags_selectors = ['.tags', '.post-tags', '.entry-tags', '.tag-links']
         
-        # Buscar en meta keywords
-        keywords_meta = soup.find('meta', {'name': 'keywords'})
-        if keywords_meta:
-            keywords = keywords_meta.get('content', '')
-            tags.extend([tag.strip() for tag in keywords.split(',') if tag.strip()])
+        for selector in tags_selectors:
+            elements = soup.select(selector + ' a, ' + selector)
+            if elements:
+                tags = ", ".join([tag.get_text().strip() for tag in elements])
+                return tags
         
-        # Buscar elementos de tags
-        tag_elements = soup.select('.tags a, .post-tags a, .tag a, .article-tags a')
-        for tag_element in tag_elements:
-            tag_text = tag_element.get_text().strip()
-            if tag_text:
-                tags.append(tag_text)
-        
-        return tags[:10]  # Máximo 10 tags
+        return ""
     
-    def extract_images(self, soup, base_url):
-        """Extrae las imágenes del artículo (máximo 2)"""
+    def extract_images(self, soup, url):
+        """Extrae imágenes del artículo"""
         images = []
+        base_domain = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
         
-        # Buscar imágenes en el contenido
-        content_area = soup.select_one('.entry-content, .post-content, .article-content, .content')
-        if content_area:
-            img_elements = content_area.find_all('img')[:2]  # Máximo 2 imágenes
-        else:
-            img_elements = soup.find_all('img')[:2]
+        img_selectors = [
+            '.entry-content img', '.post-content img', '.article-content img',
+            '.featured-image img', '.post-thumbnail img', '.wp-post-image',
+            'article img', '.content img', 'img[src*="wp-content"]'
+        ]
         
-        for img in img_elements:
-            src = img.get('src') or img.get('data-src')
-            if src:
-                full_url = urljoin(base_url, src)
-                # Filtrar imágenes muy pequeñas (probablemente iconos)
-                if not any(size in src.lower() for size in ['icon', 'logo', 'avatar']) and \
-                   not src.endswith('.gif'):
-                    images.append(full_url)
-        
-        return images
-    
-    def save_data(self):
-        """Guarda los datos en CSV y JSON"""
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        
-        # Guardar en JSON
-        json_filename = f"noticias_losandes_{timestamp}.json"
-        with open(json_filename, 'w', encoding='utf-8') as f:
-            json.dump(self.news_data, f, ensure_ascii=False, indent=2)
-        
-        # Guardar en CSV
-        csv_filename = f"noticias_losandes_{timestamp}.csv"
-        if self.news_data:
-            with open(csv_filename, 'w', newline='', encoding='utf-8') as f:
-                fieldnames = self.news_data[0].keys()
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
+        for selector in img_selectors:
+            imgs = soup.select(selector)
+            for img in imgs:
+                src = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
+                if src and len(images) < 2:
+                    # Convertir a URL absoluta
+                    if src.startswith('//'):
+                        src = f"https:{src}"
+                    elif src.startswith('/'):
+                        src = f"{base_domain}{src}"
+                    elif not src.startswith('http'):
+                        src = urljoin(url, src)
+                    
+                    # Filtrar imágenes pequeñas o iconos
+                    if not any(x in src.lower() for x in ['icon', 'logo', 'avatar', 'emoji']):
+                        if src not in images:
+                            images.append(src)
                 
-                for row in self.news_data:
-                    # Convertir listas a strings para CSV
-                    csv_row = row.copy()
-                    if isinstance(csv_row['tags'], list):
-                        csv_row['tags'] = ', '.join(csv_row['tags'])
-                    if isinstance(csv_row['link_imagenes'], list):
-                        csv_row['link_imagenes'] = ', '.join(csv_row['link_imagenes'])
-                    writer.writerow(csv_row)
+                if len(images) >= 2:
+                    break
+            
+            if len(images) >= 2:
+                break
         
-        logger.info(f"Datos guardados en {json_filename} y {csv_filename}")
-        return json_filename, csv_filename
+        return "; ".join(images)
     
-    def run_scraping(self):
-        """Ejecuta el scraping completo"""
-        start_time = datetime.now()
-        logger.info("Iniciando scraping de Los Andes...")
+    def scrape_noticias(self, max_noticias=None):
+        """Método principal para extraer noticias"""
+        logger.info("Iniciando scraping de Los Andes")
         
         # Obtener todas las URLs de artículos
         article_urls = self.get_all_article_urls()
         
-        # Filtrar URLs ya scrapeadas para procesamiento incremental
+        # Filtrar URLs ya scrapeadas
         new_urls = [url for url in article_urls if url not in self.scraped_urls]
-        logger.info(f"URLs nuevas para scrapear: {len(new_urls)}")
-        logger.info(f"URLs ya scrapeadas anteriormente: {len(self.scraped_urls)}")
         
-        if not new_urls:
-            logger.info("No hay nuevas noticias para scrapear.")
-            return
+        if max_noticias:
+            new_urls = new_urls[:max_noticias]
         
-        # Procesar URLs con ThreadPoolExecutor
+        logger.info(f"Procesando {len(new_urls)} noticias nuevas")
+        
+        # Procesar artículos con hilos concurrentes
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_url = {executor.submit(self.extract_article_data, url): url 
-                           for url in new_urls}
+            future_to_url = {executor.submit(self.extract_article_data, url): url for url in new_urls}
             
             for future in as_completed(future_to_url):
                 url = future_to_url[future]
@@ -616,75 +503,14 @@ class LosAndesScraper:
                     article_data = future.result()
                     if article_data:
                         self.news_data.append(article_data)
-                        
-                        # Progreso cada 50 artículos
-                        if len(self.news_data) % 50 == 0:
-                            logger.info(f"Procesados {len(self.news_data)} artículos...")
-                            
+                        logger.info(f"Artículo procesado: {article_data['titulo'][:50]}...")
                 except Exception as e:
                     logger.error(f"Error procesando {url}: {str(e)}")
-                
-                # Pequeña pausa entre requests
-                time.sleep(self.delay_between_requests)
         
-        # Guardar datos
-        if self.news_data:
-            json_file, csv_file = self.save_data()
-            
-            # Guardar URLs scrapeadas
-            self.save_scraped_urls()
-            
-            end_time = datetime.now()
-            duration = end_time - start_time
-            
-            logger.info(f"""
-            ========== SCRAPING COMPLETADO ==========
-            Tiempo total: {duration}
-            Artículos nuevos extraídos: {len(self.news_data)}
-            Total artículos en base: {len(self.scraped_urls)}
-            Archivos generados: {json_file}, {csv_file}
-            =========================================
-            """)
-        else:
-            logger.info("No se extrajeron nuevos artículos.")
-
-    def scrape_noticias(self, max_noticias=None):
-        """Método principal para extraer noticias"""
-        logger.info("Iniciando scraping de Los Andes")
+        # Guardar URLs scrapeadas
+        self.save_scraped_urls()
         
-        # Obtener URLs de artículos
-        article_urls = self.get_all_article_urls()
+        logger.info(f"Scraping completado. Nuevos artículos: {self.new_articles_count}")
+        logger.info(f"Total de artículos en memoria: {len(self.news_data)}")
         
-        # Filtrar URLs ya scrapeadas
-        new_urls = [url for url in article_urls if url not in self.scraped_urls]
-        
-        # Limitar a max_noticias si se especifica
-        if max_noticias is not None:
-            new_urls = new_urls[:max_noticias]
-        
-        logger.info(f"Procesando {len(new_urls)} noticias nuevas")
-        
-        for i, url in enumerate(new_urls):
-            logger.info(f"Procesando {i+1}/{len(new_urls)}: {url}")
-            
-            article_data = self.extract_article_data(url)
-            if article_data:
-                self.news_data.append(article_data)
-            
-            time.sleep(self.delay_between_requests)
-        
-        # Guardar datos
-        if self.news_data:
-            json_file, csv_file = self.save_data()
-            self.save_scraped_urls()
-            logger.info(f"Scraping completado. {len(self.news_data)} noticias extraídas")
-        
-        return len(self.news_data)
-
-# Función principal para ejecutar
-def main():
-    scraper = LosAndesScraper()
-    scraper.run_scraping()
-
-if __name__ == "__main__":
-    main()
+        return self.new_articles_count

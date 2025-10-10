@@ -147,6 +147,10 @@ fi
 # Crear directorios necesarios
 sudo mkdir -p data logs
 
+# Ajustar permisos del directorio data
+sudo chmod -R 777 /opt/news-scraper/data
+sudo chmod -R 777 /opt/news-scraper/logs
+
 # =============================================================================
 # 6. CONFIGURAR VARIABLES DE ENTORNO
 # =============================================================================
@@ -211,17 +215,20 @@ print_info "Estado de contenedores:"
 sudo docker-compose ps
 
 # =============================================================================
-# 10. EJECUTAR SCRAPING INICIAL COMPLETO INMEDIATAMENTE
+# 10. EJECUTAR SCRAPING INICIAL COMPLETO DE TODA LA PÁGINA
 # =============================================================================
-print_header "10. EJECUTANDO SCRAPING INICIAL COMPLETO INMEDIATAMENTE..."
+print_header "10. EJECUTANDO SCRAPING INICIAL COMPLETO DE TODA LA PÁGINA..."
 
 # Ejecutar scraping completo via Celery inmediatamente
-print_info "Ejecutando scraping completo via Celery..."
+print_info "Ejecutando scraping completo de todas las noticias..."
+print_info "Esto puede tomar varios minutos dependiendo del tamaño del sitio..."
+
 if ! sudo docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping; then
-    print_warning "⚠️ Scraping inicial falló. Revisa logs con: news-scraper logs"
+    print_warning "⚠️ Scraping inicial completo falló. Revisa logs con: news-scraper logs"
     print_info "El sistema está funcionando, pero el scraping inicial necesita revisión"
 else
-    print_info "✅ Scraping inicial ejecutado correctamente"
+    print_info "✅ Scraping inicial completo ejecutado correctamente"
+    print_info "Todas las noticias disponibles han sido extraídas"
 fi
 
 # =============================================================================
@@ -252,6 +259,12 @@ if sudo docker-compose exec celery-worker celery -A celery_tasks inspect schedul
 else
     print_info "✅ Celery Beat cargando tareas programadas correctamente"
 fi
+
+# Mostrar información sobre el scraping programado
+print_info "📅 Scraping programado:"
+print_info "   - Nuevas noticias: Cada hora (00 minutos)"
+print_info "   - Limpieza de logs: Domingos a las 2:00 AM"
+print_info "   - Comando manual: sudo docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scrape_new_news"
 
 # =============================================================================
 # 12. CREAR SCRIPT DE GESTIÓN SIMPLE
@@ -361,8 +374,10 @@ else
 fi
 
 echo ""
-print_info "El scraping inicial completo se ejecutó inmediatamente"
-print_info "El scraping de nuevas noticias se ejecuta automáticamente cada hora via Celery Beat"
+print_info "🎯 SCRAPING COMPLETADO:"
+print_info "   ✅ Scraping inicial completo ejecutado (todas las noticias disponibles)"
+print_info "   ✅ Scraping de nuevas noticias programado cada hora"
+print_info "   ✅ Sistema listo para funcionar automáticamente"
 
 echo ""
 print_header "✅ SISTEMA LISTO PARA USAR"

@@ -51,8 +51,8 @@ def scrape_source_internal(source_name: str, source_config: Dict) -> Dict:
             from scrapers.puno_noticias_scraper import PunoNoticiasScraper
             scraper = PunoNoticiasScraper()
             
-            # Ejecutar scraping completo (como pachamama)
-            scraper.scrape_noticias(max_noticias=None)  # Sin límite
+            # Ejecutar scraping completo (como en test local)
+            scraper.scrape_all_news()  # Scraping completo sin límites
             noticias = scraper.news_data
             
         elif source_name == 'diario_sin_fronteras':
@@ -114,7 +114,7 @@ def scrape_source(self, source_name: str, source_config: Dict) -> Dict:
             scraper = PachamamaRadioScraper()
             
             # Ejecutar scraping recursivo (como en codigos-claude) con límite de profundidad
-            scraper.scrape_recursivo(max_depth=8)
+            scraper.scrape_recursivo(max_depth=15)
             noticias = scraper.news_data
                     
         elif source_name == 'los_andes':
@@ -129,8 +129,8 @@ def scrape_source(self, source_name: str, source_config: Dict) -> Dict:
             from scrapers.puno_noticias_scraper import PunoNoticiasScraper
             scraper = PunoNoticiasScraper()
             
-            # Ejecutar scraping completo (como pachamama)
-            scraper.scrape_noticias(max_noticias=None)  # Sin límite
+            # Ejecutar scraping completo (como en test local)
+            scraper.scrape_all_news()  # Scraping completo sin límites
             noticias = scraper.news_data
             
         elif source_name == 'diario_sin_fronteras':

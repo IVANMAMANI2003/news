@@ -433,47 +433,29 @@ class PunoNoticiasScraper:
         self.scrape_all_news()
 
     def scrape_noticias(self, max_noticias=None):
-        """Método principal para extraer noticias"""
+        """Método principal para extraer noticias (compatible con celery_tasks)"""
         self.logger.info("Iniciando scraping de Puno Noticias")
         
-        # Descubrir URLs
+        # Descubrir todas las URLs
         all_news_urls = self.discover_all_urls()
         
         # Filtrar URLs ya scrapeadas
         new_urls = [url for url in all_news_urls if url not in self.scraped_urls]
         
-        # Limitar a max_noticias si se especifica
-        if max_noticias is not None:
+        if max_noticias:
             new_urls = new_urls[:max_noticias]
         
         self.logger.info(f"Procesando {len(new_urls)} noticias nuevas")
         
         for i, url in enumerate(new_urls, 1):
-            self.logger.info(f"Procesando {i}/{len(new_urls)}: {url}")
+            self.logger.info(f"Scrapeando {i}/{len(new_urls)}: {url}")
             
             news_data = self.extract_news_data(url)
             if news_data and news_data.get('titulo'):
                 self.news_data.append(news_data)
                 self.save_scraped_url(url)
-                
+                    
             time.sleep(self.delay)
         
-        # Guardar datos
-        self.save_data()
-        self.logger.info(f"Scraping completado. {len(self.news_data)} noticias extraídas")
-        
+        self.logger.info(f"Scraping completado. Total noticias: {len(self.news_data)}")
         return len(self.news_data)
-
-if __name__ == "__main__":
-    # Configuración
-    scraper = PunoNoticiasScraper(
-        base_url="https://punonoticias.pe/",
-        delay=1  # Delay entre requests
-    )
-    
-    # Para primera ejecución completa
-    print("Iniciando scraping completo de PunoNoticias.pe...")
-    scraper.scrape_all_news()
-    
-    # Para ejecuciones incrementales posteriores, usar:
-    # scraper.run_incremental()

@@ -57,6 +57,11 @@ services:
       SCRAPING_WORKERS: 10
       SCRAPING_RETRIES: 5
       SCRAPING_INCREMENTAL: "true"
+      SCHEDULER_INTERVAL: 1
+      SCHEDULER_MAX_JOBS: 4
+      SCHEDULER_RETRY: "true"
+      SCHEDULER_MAX_RETRIES: 5
+      SCHEDULER_RETRY_DELAY: 15
       SOURCE_SIN_FRONTERAS: "true"
       SOURCE_LOS_ANDES: "true"
       SOURCE_PACHAMAMA: "true"
@@ -72,7 +77,7 @@ services:
       - ./logs:/app/logs
       - ./codigos-claude:/app/codigos-claude
     restart: unless-stopped
-    command: ["celery", "-A", "celery_tasks", "worker", "--loglevel=info", "--concurrency=1"]
+    command: ["celery", "-A", "celery_tasks", "worker", "--loglevel=info", "--concurrency=4"]
     networks:
       - news_net
 

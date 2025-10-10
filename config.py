@@ -18,24 +18,24 @@ class Config:
         'password': os.getenv('DB_PASSWORD', '123456')
     }
     
-    # Configuración de scraping
+    # Configuración de scraping - SIN LIMITACIONES
     SCRAPING = {
-        'delay_between_sources': int(os.getenv('SCRAPING_DELAY', 5)),
-        'max_workers_per_source': int(os.getenv('SCRAPING_WORKERS', 3)),
+        'delay_between_sources': int(os.getenv('SCRAPING_DELAY', 1)),  # Más rápido
+        'max_workers_per_source': int(os.getenv('SCRAPING_WORKERS', 10)),  # Más workers
         'timeout': None,  # Sin límite de tiempo
-        'max_retries': int(os.getenv('SCRAPING_RETRIES', 3)),
+        'max_retries': int(os.getenv('SCRAPING_RETRIES', 5)),  # Más reintentos
         'enable_incremental': os.getenv('SCRAPING_INCREMENTAL', 'true').lower() == 'true',
         'max_articles_per_source': None  # Sin límite de artículos
     }
     
-    # Configuración de scheduler
+    # Configuración de scheduler - SIN LIMITACIONES
     SCHEDULER = {
-        'interval_hours': int(os.getenv('SCHEDULER_INTERVAL', 1)),
-        'max_concurrent_jobs': int(os.getenv('SCHEDULER_MAX_JOBS', 1)),
+        'interval_hours': int(os.getenv('SCHEDULER_INTERVAL', 1)),  # Cada hora
+        'max_concurrent_jobs': int(os.getenv('SCHEDULER_MAX_JOBS', 4)),  # Más trabajos concurrentes
         'timeout_minutes': None,  # Sin límite de tiempo
         'retry_failed_jobs': os.getenv('SCHEDULER_RETRY', 'true').lower() == 'true',
-        'max_retries': int(os.getenv('SCHEDULER_MAX_RETRIES', 3)),
-        'retry_delay_minutes': int(os.getenv('SCHEDULER_RETRY_DELAY', 30))
+        'max_retries': int(os.getenv('SCHEDULER_MAX_RETRIES', 5)),  # Más reintentos
+        'retry_delay_minutes': int(os.getenv('SCHEDULER_RETRY_DELAY', 15))  # Menos delay entre reintentos
     }
     
     # Configuración de fuentes
