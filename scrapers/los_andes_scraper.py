@@ -35,10 +35,10 @@ class LosAndesScraper:
         self.scraped_urls = self.load_scraped_urls()
         self.new_articles_count = 0
         
-        # Configuración
+        # Configuración sin límites
         self.delay_between_requests = 1  # segundos entre requests
-        self.max_workers = 5  # hilos concurrentes
-        self.timeout = 30
+        self.max_workers = 10  # más workers para ser más agresivo
+        self.timeout = None  # sin timeout
         
     def load_scraped_urls(self):
         """Carga las URLs ya scrapeadas desde el archivo de control"""
@@ -127,9 +127,10 @@ class LosAndesScraper:
                 time.sleep(self.delay_between_requests)
                 
                 # Límite de páginas por seguridad (ajustar según necesidad)
-                if page > 100:
-                    logger.warning(f"Límite de páginas alcanzado para {section}")
-                    break
+                # Sin límite de páginas - explorar todo
+                # if page > 100:
+                #     logger.warning(f"Límite de páginas alcanzado para {section}")
+                #     break
         
         # Explorar sitemap si está disponible
         self.explore_sitemap(article_urls)
@@ -228,7 +229,7 @@ class LosAndesScraper:
         return False
     
     def explore_sitemap(self, article_urls):
-        """Explora el sitemap para encontrar más URLs"""
+        """Explora el sitemap para encontrar más URLs (como codigos-claude)"""
         sitemaps = [
             "/sitemap.xml",
             "/sitemap_index.xml",
@@ -251,9 +252,12 @@ class LosAndesScraper:
                         article_urls.add(url)
                 
                 logger.info(f"URLs encontradas en sitemap: {len(urls)}")
+        
+        # Explorar robots.txt para encontrar más sitemaps
+        self.explore_robots_txt(article_urls)
     
     def explore_robots_txt(self, article_urls):
-        """Explora robots.txt para encontrar más rutas"""
+        """Explora robots.txt para encontrar más rutas (como codigos-claude)"""
         robots_url = urljoin(self.base_url, "/robots.txt")
         response = self.make_request(robots_url)
         

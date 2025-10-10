@@ -68,7 +68,7 @@ class PunoNoticiasScraper:
     def get_page(self, url: str) -> BeautifulSoup:
         """Obtener y parsear página"""
         try:
-            response = self.session.get(url, timeout=30)
+            response = self.session.get(url, timeout=None)
             response.raise_for_status()
             return BeautifulSoup(response.content, 'html.parser')
         except Exception as e:

@@ -79,7 +79,7 @@ class PachamamaRadioScraper:
                 json.dump([], f, ensure_ascii=False, indent=2)
 
     def hacer_request(self, url: str) -> BeautifulSoup:
-        """Realiza una petición HTTP con manejo de errores"""
+        """Realiza una petición HTTP con manejo de errores (copiado de codigos-claude)"""
         try:
             response = self.session.get(url, timeout=30)
             response.raise_for_status()
@@ -280,19 +280,39 @@ class PachamamaRadioScraper:
         """Encuentra todos los enlaces a noticias"""
         enlaces = set()
         
-        # Selectores para enlaces de noticias
+        # Selectores para enlaces de noticias (como en codigos-claude)
         selectores_enlaces = [
             'a[href*="/noticia"]', 'a[href*="/post"]', 'a[href*="/article"]',
             '.entry-title a', '.post-title a', '.article-title a',
             'article a', '.blog-post a', '.news-item a',
-            'a[href*="' + urlparse(base_url).netloc + '"]'
+            'a[href*="' + urlparse(base_url).netloc + '"]',
+            # Selectores adicionales para investigar
+            'a[href]',  # Todos los enlaces
+            'a[href*="/20"]',  # URLs con años
+            'a[href*="/202"]',  # URLs con años completos
         ]
         
         self.logger.info(f"Buscando enlaces en {base_url}")
         
+        # Mostrar estructura HTML básica para investigar
+        self.logger.info("Estructura HTML básica:")
+        self.logger.info(f"  - Título de la página: {soup.title.get_text().strip() if soup.title else 'No encontrado'}")
+        self.logger.info(f"  - Total de elementos <a>: {len(soup.find_all('a'))}")
+        self.logger.info(f"  - Total de elementos <article>: {len(soup.find_all('article'))}")
+        self.logger.info(f"  - Total de elementos <div>: {len(soup.find_all('div'))}")
+        
         for selector in selectores_enlaces:
             links = soup.select(selector)
             self.logger.info(f"Selector '{selector}' encontró {len(links)} enlaces")
+            
+            # Mostrar algunos enlaces para investigar
+            if len(links) > 0 and selector == 'a[href]':
+                self.logger.info("Primeros 10 enlaces encontrados:")
+                for i, link in enumerate(links[:10]):
+                    href = link.get('href')
+                    text = link.get_text().strip()[:50]
+                    self.logger.info(f"  {i+1}. {href} - '{text}'")
+            
             for link in links:
                 href = link.get('href')
                 if href:
