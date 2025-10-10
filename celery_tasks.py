@@ -43,16 +43,16 @@ def scrape_source_internal(source_name: str, source_config: Dict) -> Dict:
             from scrapers.los_andes_scraper import LosAndesScraper
             scraper = LosAndesScraper()
             
-            # Ejecutar scraping
-            scraper.scrape_noticias()
+            # Ejecutar scraping completo (como pachamama)
+            scraper.scrape_noticias(max_noticias=None)  # Sin límite
             noticias = scraper.news_data
             
         elif source_name == 'puno_noticias':
             from scrapers.puno_noticias_scraper import PunoNoticiasScraper
             scraper = PunoNoticiasScraper()
             
-            # Ejecutar scraping
-            scraper.scrape_noticias()
+            # Ejecutar scraping completo (como pachamama)
+            scraper.scrape_noticias(max_noticias=None)  # Sin límite
             noticias = scraper.news_data
             
         elif source_name == 'diario_sin_fronteras':
@@ -121,16 +121,16 @@ def scrape_source(self, source_name: str, source_config: Dict) -> Dict:
             from scrapers.los_andes_scraper import LosAndesScraper
             scraper = LosAndesScraper()
             
-            # Ejecutar scraping
-            scraper.scrape_noticias()
+            # Ejecutar scraping completo (como pachamama)
+            scraper.scrape_noticias(max_noticias=None)  # Sin límite
             noticias = scraper.news_data
             
         elif source_name == 'puno_noticias':
             from scrapers.puno_noticias_scraper import PunoNoticiasScraper
             scraper = PunoNoticiasScraper()
             
-            # Ejecutar scraping
-            scraper.scrape_noticias()
+            # Ejecutar scraping completo (como pachamama)
+            scraper.scrape_noticias(max_noticias=None)  # Sin límite
             noticias = scraper.news_data
             
         elif source_name == 'diario_sin_fronteras':
