@@ -288,8 +288,11 @@ class PachamamaRadioScraper:
             'a[href*="' + urlparse(base_url).netloc + '"]'
         ]
         
+        self.logger.info(f"Buscando enlaces en {base_url}")
+        
         for selector in selectores_enlaces:
             links = soup.select(selector)
+            self.logger.info(f"Selector '{selector}' encontró {len(links)} enlaces")
             for link in links:
                 href = link.get('href')
                 if href:
@@ -308,7 +311,9 @@ class PachamamaRadioScraper:
                             '.jpg', '.png', '.gif', '.pdf', '.doc'
                         ]):
                             enlaces.add(href)
+                            self.logger.info(f"Enlace agregado: {href}")
         
+        self.logger.info(f"Total de enlaces encontrados: {len(enlaces)}")
         return enlaces
 
     def encontrar_paginas_navegacion(self, soup: BeautifulSoup, base_url: str) -> Set[str]:
@@ -397,10 +402,15 @@ class PachamamaRadioScraper:
                 enlaces_noticias = self.encontrar_enlaces_noticias(soup, url)
                 enlaces_paginas = self.encontrar_paginas_navegacion(soup, url)
                 
+                self.logger.info(f"Enlaces de noticias encontrados: {len(enlaces_noticias)}")
+                self.logger.info(f"Enlaces de páginas encontrados: {len(enlaces_paginas)}")
+                
                 # Añadir enlaces no visitados
                 for enlace in enlaces_noticias | enlaces_paginas:
                     if enlace not in urls_visitadas and enlace not in self.urls_procesadas:
                         urls_por_procesar.add(enlace)
+                
+                self.logger.info(f"URLs agregadas para siguiente nivel: {len(urls_por_procesar)}")
                 
                 # Delay entre peticiones
                 time.sleep(self.delay)

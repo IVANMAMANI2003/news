@@ -121,6 +121,7 @@ class LosAndesScraper:
                 
                 article_urls.update(page_articles)
                 logger.info(f"Encontrados {len(page_articles)} artículos en página {page}")
+                logger.info(f"Total acumulado: {len(article_urls)} artículos")
                 
                 page += 1
                 time.sleep(self.delay_between_requests)
@@ -154,13 +155,19 @@ class LosAndesScraper:
             'h3 a[href]',
             '.headline a[href]',
             '.title a[href]',
-            'a[href*="/202"]',  # URLs que contienen años
+            'a[href*="/20"]',  # URLs que contienen años
             'a[href*="/noticia"]',
-            'a[href*="/news"]'
+            'a[href*="/news"]',
+            'a[href*="/articulo"]',
+            'a[href*="/post"]',
+            '.content a[href]',
+            '.main-content a[href]',
+            '.news-content a[href]'
         ]
         
         for selector in selectors:
             links = soup.select(selector)
+            logger.info(f"Selector '{selector}' encontró {len(links)} enlaces")
             for link in links:
                 href = link.get('href')
                 if href:

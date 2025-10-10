@@ -354,10 +354,14 @@ class PunoNoticiasScraper:
             # Encontrar URLs de noticias
             news_urls = self.extract_news_urls(soup, current_url)
             discovered_urls.update(news_urls)
+            self.logger.info(f"Encontradas {len(news_urls)} URLs de noticias en {current_url}")
             
             # Encontrar páginas de paginación
             pagination_urls = self.extract_pagination_urls(soup, current_url)
             to_visit.extend([url for url in pagination_urls if url not in visited])
+            self.logger.info(f"Encontradas {len(pagination_urls)} URLs de paginación")
+            
+            self.logger.info(f"Total URLs descubiertas hasta ahora: {len(discovered_urls)}")
             
             # Encontrar URLs de categorías
             category_urls = self.extract_category_urls(soup, current_url)
