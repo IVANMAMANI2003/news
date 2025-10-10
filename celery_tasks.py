@@ -48,7 +48,7 @@ def scrape_source_internal(source_name: str, source_config: Dict, is_initial_scr
                     logger.warning(f"Error limpiando URLs procesadas para {source_name}: {e}")
             
             # Ejecutar scraping recursivo (como en codigos-claude) con límite de profundidad
-            scraper.scrape_recursivo(max_noticias=None)
+            scraper.scrape_recursivo(max_depth=15)
             noticias = scraper.news_data
                     
         elif source_name == 'los_andes':
