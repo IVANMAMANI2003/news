@@ -35,8 +35,8 @@ def scrape_source_internal(source_name: str, source_config: Dict) -> Dict:
             from scrapers.pachamama_scraper import PachamamaRadioScraper
             scraper = PachamamaRadioScraper()
             
-            # Ejecutar scraping
-            scraper.scrape_noticias()
+            # Ejecutar scraping recursivo (como en codigos-claude) con límites
+            scraper.scrape_recursivo(max_depth=8, max_noticias=500, timeout_minutes=20)
             noticias = scraper.news_data
                     
         elif source_name == 'los_andes':
@@ -113,8 +113,8 @@ def scrape_source(self, source_name: str, source_config: Dict) -> Dict:
             from scrapers.pachamama_scraper import PachamamaRadioScraper
             scraper = PachamamaRadioScraper()
             
-            # Ejecutar scraping
-            scraper.scrape_noticias()
+            # Ejecutar scraping recursivo (como en codigos-claude) con límites
+            scraper.scrape_recursivo(max_depth=8, max_noticias=500, timeout_minutes=20)
             noticias = scraper.news_data
                     
         elif source_name == 'los_andes':

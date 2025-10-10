@@ -389,6 +389,7 @@ class PachamamaRadioScraper:
                         if noticia and noticia['titulo']:
                             self.guardar_noticia(noticia)
                             self.guardar_url_procesada(url)
+                            self.news_data.append(noticia)  # Agregar a la lista
                             total_noticias += 1
                             self.logger.info(f"Noticia extraída: {noticia['titulo'][:50]}...")
                 
@@ -458,6 +459,7 @@ class PachamamaRadioScraper:
                     if noticia and noticia['titulo']:
                         self.guardar_noticia(noticia)
                         self.guardar_url_procesada(enlace)
+                        self.news_data.append(noticia)  # Agregar a la lista
                         nuevas_noticias += 1
                         self.logger.info(f"Nueva noticia: {noticia['titulo'][:50]}...")
                     
@@ -493,6 +495,7 @@ class PachamamaRadioScraper:
                     if noticia and noticia['titulo']:
                         self.guardar_noticia(noticia)
                         self.guardar_url_procesada(url)
+                        self.news_data.append(noticia)  # Agregar a la lista
                         total_noticias += 1
                         self.logger.info(f"Noticia extraída: {noticia['titulo'][:50]}...")
             
@@ -509,4 +512,5 @@ class PachamamaRadioScraper:
             time.sleep(self.delay)
         
         self.logger.info(f"Scraping completado. Total de noticias extraídas: {total_noticias}")
+        self.logger.info(f"Noticias en memoria: {len(self.news_data)}")
         return total_noticias
