@@ -20,6 +20,77 @@ from unified_scraper import normalize_news_data, save_news_files
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def scrape_source_internal(source_name: str, source_config: Dict) -> Dict:
+    """
+    Función interna para hacer scraping de una fuente específica (sin decorador de Celery)
+    """
+    try:
+        logger.info(f"Iniciando scraping de {source_name}")
+        
+        # Importar scraper según la fuente
+        scraper = None
+        noticias = []
+        
+        if source_name == 'pachamama':
+            from scrapers.pachamama_scraper import PachamamaRadioScraper
+            scraper = PachamamaRadioScraper()
+            
+            # Ejecutar scraping
+            scraper.scrape_noticias()
+            noticias = scraper.news_data
+                    
+        elif source_name == 'los_andes':
+            from scrapers.los_andes_scraper import LosAndesScraper
+            scraper = LosAndesScraper()
+            
+            # Ejecutar scraping
+            scraper.scrape_noticias()
+            noticias = scraper.news_data
+            
+        elif source_name == 'puno_noticias':
+            from scrapers.puno_noticias_scraper import PunoNoticiasScraper
+            scraper = PunoNoticiasScraper()
+            
+            # Ejecutar scraping
+            scraper.scrape_noticias()
+            noticias = scraper.news_data
+            
+        elif source_name == 'diario_sin_fronteras':
+            from scrapers.diario_sin_fronteras_scraper import \
+                DiarioSinFronterasScraper
+            scraper = DiarioSinFronterasScraper()
+            
+            # Ejecutar scraping
+            scraper.scrape_noticias()
+            noticias = scraper.news_data
+        
+        # Normalizar noticias
+        noticias_normalizadas = []
+        for noticia in noticias:
+            noticia_normalizada = normalize_news_data(noticia, source_name)
+            noticias_normalizadas.append(noticia_normalizada)
+        
+        # Guardar archivos
+        save_news_files(noticias_normalizadas, source_name)
+        
+        return {
+            'source': source_name,
+            'noticias_count': len(noticias_normalizadas),
+            'status': 'completed',
+            'timestamp': datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error en scraping de {source_name}: {e}")
+        return {
+            'source': source_name,
+            'noticias_count': 0,
+            'status': 'error',
+            'error': str(e),
+            'exc_type': type(e).__name__,
+            'timestamp': datetime.now().isoformat()
+        }
+
 @celery_app.task(bind=True, name='news_scraper.tasks.scrape_source')
 def scrape_source(self, source_name: str, source_config: Dict) -> Dict:
     """
@@ -209,7 +280,7 @@ def scheduled_scraping():
                 try:
                     logger.info(f"Procesando fuente completa: {source['name']}")
                     # Ejecutar scraping directamente sin usar .get()
-                    result = scrape_source(source['name'], {})
+                    result = scrape_source_internal(source['name'], {})
                     results.append(result)
                     logger.info(f"Completado: {source['name']}")
                 except Exception as e:
@@ -253,7 +324,7 @@ def scrape_new_news():
                 try:
                     logger.info(f"Procesando nuevas noticias de: {source['name']}")
                     # Ejecutar scraping directamente sin usar .get()
-                    result = scrape_source(source['name'], {})
+                    result = scrape_source_internal(source['name'], {})
                     results.append(result)
                     logger.info(f"Completado: {source['name']}")
                 except Exception as e:
