@@ -1,5 +1,6 @@
+version: "3.9"
+
 services:
-  # Redis para cache y colas
   redis:
     image: redis:7-alpine
     container_name: news_scraper_redis
@@ -13,8 +14,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - news_net
 
-  # Base de datos PostgreSQL
   postgres:
     image: postgres:15
     container_name: news_scraper_db
@@ -33,47 +35,38 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - news_net
 
-  # Worker de Celery para scraping
   celery-worker:
     build: .
+    container_name: news_scraper_worker
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
     environment:
-      # Redis
       REDIS_URL: redis://redis:6379/0
-      
-      # Base de datos
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: news_scraper
       DB_USER: postgres
       DB_PASSWORD: 123456
-      
-      # Configuración de scraping
       SCRAPING_DELAY: 1
       SCRAPING_WORKERS: 10
       SCRAPING_TIMEOUT: 30
       SCRAPING_RETRIES: 3
       SCRAPING_INCREMENTAL: "true"
       SCRAPING_MAX_ARTICLES: 1000
-      
-      # Fuentes
       SOURCE_SIN_FRONTERAS: "true"
       SOURCE_LOS_ANDES: "true"
       SOURCE_PACHAMAMA: "true"
       SOURCE_PUNO_NOTICIAS: "true"
-      
-      # Salida
       OUTPUT_CSV: "true"
       OUTPUT_JSON: "true"
       OUTPUT_DIR: "/app/data"
       OUTPUT_TIMESTAMP: "true"
-      
-      # Logging
       LOG_LEVEL: INFO
       LOG_FILE: "/app/logs/celery_worker.log"
     volumes:
@@ -81,9 +74,10 @@ services:
       - ./logs:/app/logs
       - ./codigos-claude:/app/codigos-claude
     restart: unless-stopped
-    command: ["celery", "-A", "celery_tasks", "worker", "--loglevel=info", "--concurrency=1", "--queues=scraping"]
+    command: ["celery", "-A", "celery_tasks", "worker", "--loglevel=info", "--concurrency=1"]
+    networks:
+      - news_net
 
-  # Beat scheduler de Celery
   celery-beat:
     build: .
     container_name: news_scraper_beat
@@ -93,26 +87,25 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      # Redis
       REDIS_URL: redis://redis:6379/0
-      
-      # Base de datos
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: news_scraper
       DB_USER: postgres
       DB_PASSWORD: 123456
-      
-      # Logging
       LOG_LEVEL: INFO
       LOG_FILE: "/app/logs/celery_beat.log"
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
     command: ["celery", "-A", "celery_tasks", "beat", "--loglevel=info"]
-
-
+    networks:
+      - news_net
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  news_net:
+    driver: bridge

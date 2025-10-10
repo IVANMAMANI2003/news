@@ -217,7 +217,12 @@ print_header "10. EJECUTANDO SCRAPING INICIAL COMPLETO INMEDIATAMENTE..."
 
 # Ejecutar scraping completo via Celery inmediatamente
 print_info "Ejecutando scraping completo via Celery..."
-sudo docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping
+if ! sudo docker-compose exec celery-worker celery -A celery_tasks call news_scraper.tasks.scheduled_scraping; then
+    print_warning "⚠️ Scraping inicial falló. Revisa logs con: news-scraper logs"
+    print_info "El sistema está funcionando, pero el scraping inicial necesita revisión"
+else
+    print_info "✅ Scraping inicial ejecutado correctamente"
+fi
 
 # =============================================================================
 # 11. CONFIGURAR CELERY BEAT PARA NUEVAS NOTICIAS
@@ -230,10 +235,23 @@ sudo docker-compose exec redis redis-cli DEL celerybeat-schedule 2>/dev/null || 
 
 # Reiniciar Celery Beat
 print_info "Reiniciando Celery Beat..."
-sudo docker-compose up -d celery-beat
+if sudo docker-compose up -d celery-beat; then
+    print_info "✅ Celery Beat iniciado correctamente"
+else
+    print_warning "⚠️ Error iniciando Celery Beat. Revisa logs con: news-scraper logs"
+fi
 
 # Esperar a que se configure
 sleep 10
+
+# Verificar que Celery Beat esté funcionando
+print_info "Verificando configuración de Celery Beat..."
+if sudo docker-compose exec celery-worker celery -A celery_tasks inspect scheduled | grep -q "empty"; then
+    print_warning "⚠️ Celery Beat no está cargando tareas programadas"
+    print_info "Ejecuta: sudo docker-compose logs celery-beat para revisar errores"
+else
+    print_info "✅ Celery Beat cargando tareas programadas correctamente"
+fi
 
 # =============================================================================
 # 12. CREAR SCRIPT DE GESTIÓN SIMPLE
@@ -317,7 +335,33 @@ print_info "  news-scraper scrape   # Ejecutar scraping manual"
 print_info "  news-scraper stats    # Ver estadísticas de BD"
 
 echo ""
-print_info "El scraping inicial completo ya se ejecutó inmediatamente"
+print_info "Verificación final del sistema:"
+
+# Verificar estado de contenedores
+if sudo docker-compose ps | grep -q "Up"; then
+    print_info "✅ Todos los contenedores están funcionando"
+else
+    print_warning "⚠️ Algunos contenedores no están funcionando correctamente"
+fi
+
+# Verificar tareas programadas
+if sudo docker-compose exec celery-worker celery -A celery_tasks inspect scheduled | grep -q "empty"; then
+    print_warning "⚠️ Celery Beat no está cargando tareas programadas"
+    print_info "Ejecuta: sudo docker-compose logs celery-beat para revisar errores"
+else
+    print_info "✅ Celery Beat cargando tareas programadas correctamente"
+fi
+
+# Verificar noticias en BD
+NOTICIAS_COUNT=$(sudo docker-compose exec -T postgres psql -U postgres -d news_scraper -c "SELECT COUNT(*) FROM noticias;" 2>/dev/null | grep -o '[0-9]*' | tail -1)
+if [ "$NOTICIAS_COUNT" -gt 0 ]; then
+    print_info "✅ Base de datos contiene $NOTICIAS_COUNT noticias"
+else
+    print_warning "⚠️ No hay noticias en la base de datos"
+fi
+
+echo ""
+print_info "El scraping inicial completo se ejecutó inmediatamente"
 print_info "El scraping de nuevas noticias se ejecuta automáticamente cada hora via Celery Beat"
 
 echo ""
