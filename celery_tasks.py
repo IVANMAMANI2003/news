@@ -38,12 +38,17 @@ def scrape_source_internal(source_name: str, source_config: Dict, is_initial_scr
             # Solo limpiar URLs procesadas si es scraping inicial
             if is_initial_scraping:
                 scraper.urls_procesadas.clear()
-                if os.path.exists(scraper.urls_procesadas_file):
-                    os.remove(scraper.urls_procesadas_file)
-                    logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+                try:
+                    if os.path.exists(scraper.urls_procesadas_file):
+                        os.remove(scraper.urls_procesadas_file)
+                        logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+                    else:
+                        logger.info(f"Archivo de URLs procesadas no existe para {source_name} (scraping inicial)")
+                except Exception as e:
+                    logger.warning(f"Error limpiando URLs procesadas para {source_name}: {e}")
             
             # Ejecutar scraping recursivo (como en codigos-claude) con límite de profundidad
-            scraper.scrape_recursivo(max_depth=15)
+            scraper.scrape_noticias(max_noticias=None)
             noticias = scraper.news_data
                     
         elif source_name == 'los_andes':
@@ -53,9 +58,14 @@ def scrape_source_internal(source_name: str, source_config: Dict, is_initial_scr
             # Solo limpiar URLs procesadas si es scraping inicial
             if is_initial_scraping:
                 scraper.scraped_urls.clear()
-                if os.path.exists(scraper.scraped_urls_file):
-                    os.remove(scraper.scraped_urls_file)
-                    logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+                try:
+                    if os.path.exists(scraper.scraped_urls_file):
+                        os.remove(scraper.scraped_urls_file)
+                        logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+                    else:
+                        logger.info(f"Archivo de URLs procesadas no existe para {source_name} (scraping inicial)")
+                except Exception as e:
+                    logger.warning(f"Error limpiando URLs procesadas para {source_name}: {e}")
             
             # Ejecutar scraping completo (como pachamama)
             scraper.scrape_noticias(max_noticias=None)  # Sin límite
@@ -68,9 +78,14 @@ def scrape_source_internal(source_name: str, source_config: Dict, is_initial_scr
             # Solo limpiar URLs procesadas si es scraping inicial
             if is_initial_scraping:
                 scraper.scraped_urls.clear()
-                if os.path.exists(scraper.scraped_urls_file):
-                    os.remove(scraper.scraped_urls_file)
-                    logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+                try:
+                    if os.path.exists(scraper.scraped_urls_file):
+                        os.remove(scraper.scraped_urls_file)
+                        logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+                    else:
+                        logger.info(f"Archivo de URLs procesadas no existe para {source_name} (scraping inicial)")
+                except Exception as e:
+                    logger.warning(f"Error limpiando URLs procesadas para {source_name}: {e}")
             
             # Ejecutar scraping completo (como en test local)
             scraper.scrape_all_news()  # Scraping completo sin límites
@@ -145,9 +160,14 @@ def scrape_source(self, source_name: str, source_config: Dict) -> Dict:
             # Solo limpiar URLs procesadas si es scraping inicial
             if is_initial_scraping:
                 scraper.scraped_urls.clear()
-                if os.path.exists(scraper.scraped_urls_file):
-                    os.remove(scraper.scraped_urls_file)
-                    logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+                try:
+                    if os.path.exists(scraper.scraped_urls_file):
+                        os.remove(scraper.scraped_urls_file)
+                        logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+                    else:
+                        logger.info(f"Archivo de URLs procesadas no existe para {source_name} (scraping inicial)")
+                except Exception as e:
+                    logger.warning(f"Error limpiando URLs procesadas para {source_name}: {e}")
             
             # Ejecutar scraping completo (como pachamama)
             scraper.scrape_noticias(max_noticias=None)  # Sin límite
@@ -160,9 +180,14 @@ def scrape_source(self, source_name: str, source_config: Dict) -> Dict:
             # Solo limpiar URLs procesadas si es scraping inicial
             if is_initial_scraping:
                 scraper.scraped_urls.clear()
-                if os.path.exists(scraper.scraped_urls_file):
-                    os.remove(scraper.scraped_urls_file)
-                    logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+                try:
+                    if os.path.exists(scraper.scraped_urls_file):
+                        os.remove(scraper.scraped_urls_file)
+                        logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+                    else:
+                        logger.info(f"Archivo de URLs procesadas no existe para {source_name} (scraping inicial)")
+                except Exception as e:
+                    logger.warning(f"Error limpiando URLs procesadas para {source_name}: {e}")
             
             # Ejecutar scraping completo (como en test local)
             scraper.scrape_all_news()  # Scraping completo sin límites
