@@ -208,9 +208,9 @@ def scheduled_scraping():
             if source['enabled']:
                 try:
                     logger.info(f"Procesando fuente completa: {source['name']}")
-                    result = scrape_source.delay(source['name'], {})
-                    result_data = result.get(timeout=600)  # 10 minutos timeout
-                    results.append(result_data)
+                    # Ejecutar scraping directamente sin usar .get()
+                    result = scrape_source(source['name'], {})
+                    results.append(result)
                     logger.info(f"Completado: {source['name']}")
                 except Exception as e:
                     logger.error(f"Error en fuente {source['name']}: {e}")
@@ -252,9 +252,9 @@ def scrape_new_news():
             if source['enabled']:
                 try:
                     logger.info(f"Procesando nuevas noticias de: {source['name']}")
-                    result = scrape_source.delay(source['name'], {})
-                    result_data = result.get(timeout=300)  # 5 minutos timeout para nuevas noticias
-                    results.append(result_data)
+                    # Ejecutar scraping directamente sin usar .get()
+                    result = scrape_source(source['name'], {})
+                    results.append(result)
                     logger.info(f"Completado: {source['name']}")
                 except Exception as e:
                     logger.error(f"Error en fuente {source['name']}: {e}")
