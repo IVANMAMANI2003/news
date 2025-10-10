@@ -20,7 +20,7 @@ from unified_scraper import normalize_news_data, save_news_files
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def scrape_source_internal(source_name: str, source_config: Dict) -> Dict:
+def scrape_source_internal(source_name: str, source_config: Dict, is_initial_scraping: bool = False) -> Dict:
     """
     Función interna para hacer scraping de una fuente específica (sin decorador de Celery)
     """
@@ -35,6 +35,13 @@ def scrape_source_internal(source_name: str, source_config: Dict) -> Dict:
             from scrapers.pachamama_scraper import PachamamaRadioScraper
             scraper = PachamamaRadioScraper()
             
+            # Solo limpiar URLs procesadas si es scraping inicial
+            if is_initial_scraping:
+                scraper.urls_procesadas.clear()
+                if os.path.exists(scraper.urls_procesadas_file):
+                    os.remove(scraper.urls_procesadas_file)
+                    logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+            
             # Ejecutar scraping recursivo (como en codigos-claude) con límite de profundidad
             scraper.scrape_recursivo(max_depth=15)
             noticias = scraper.news_data
@@ -43,6 +50,13 @@ def scrape_source_internal(source_name: str, source_config: Dict) -> Dict:
             from scrapers.los_andes_scraper import LosAndesScraper
             scraper = LosAndesScraper()
             
+            # Solo limpiar URLs procesadas si es scraping inicial
+            if is_initial_scraping:
+                scraper.scraped_urls.clear()
+                if os.path.exists(scraper.scraped_urls_file):
+                    os.remove(scraper.scraped_urls_file)
+                    logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+            
             # Ejecutar scraping completo (como pachamama)
             scraper.scrape_noticias(max_noticias=None)  # Sin límite
             noticias = scraper.news_data
@@ -50,6 +64,13 @@ def scrape_source_internal(source_name: str, source_config: Dict) -> Dict:
         elif source_name == 'puno_noticias':
             from scrapers.puno_noticias_scraper import PunoNoticiasScraper
             scraper = PunoNoticiasScraper()
+            
+            # Solo limpiar URLs procesadas si es scraping inicial
+            if is_initial_scraping:
+                scraper.scraped_urls.clear()
+                if os.path.exists(scraper.scraped_urls_file):
+                    os.remove(scraper.scraped_urls_file)
+                    logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
             
             # Ejecutar scraping completo (como en test local)
             scraper.scrape_all_news()  # Scraping completo sin límites
@@ -121,6 +142,13 @@ def scrape_source(self, source_name: str, source_config: Dict) -> Dict:
             from scrapers.los_andes_scraper import LosAndesScraper
             scraper = LosAndesScraper()
             
+            # Solo limpiar URLs procesadas si es scraping inicial
+            if is_initial_scraping:
+                scraper.scraped_urls.clear()
+                if os.path.exists(scraper.scraped_urls_file):
+                    os.remove(scraper.scraped_urls_file)
+                    logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
+            
             # Ejecutar scraping completo (como pachamama)
             scraper.scrape_noticias(max_noticias=None)  # Sin límite
             noticias = scraper.news_data
@@ -128,6 +156,13 @@ def scrape_source(self, source_name: str, source_config: Dict) -> Dict:
         elif source_name == 'puno_noticias':
             from scrapers.puno_noticias_scraper import PunoNoticiasScraper
             scraper = PunoNoticiasScraper()
+            
+            # Solo limpiar URLs procesadas si es scraping inicial
+            if is_initial_scraping:
+                scraper.scraped_urls.clear()
+                if os.path.exists(scraper.scraped_urls_file):
+                    os.remove(scraper.scraped_urls_file)
+                    logger.info(f"URLs procesadas limpiadas para {source_name} (scraping inicial)")
             
             # Ejecutar scraping completo (como en test local)
             scraper.scrape_all_news()  # Scraping completo sin límites
@@ -280,7 +315,7 @@ def scheduled_scraping():
                 try:
                     logger.info(f"Procesando fuente completa: {source['name']}")
                     # Ejecutar scraping directamente sin usar .get()
-                    result = scrape_source_internal(source['name'], {})
+                    result = scrape_source_internal(source['name'], {}, is_initial_scraping=True)
                     results.append(result)
                     logger.info(f"Completado: {source['name']}")
                 except Exception as e:
