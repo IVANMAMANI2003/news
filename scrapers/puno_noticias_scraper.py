@@ -395,12 +395,40 @@ class PunoNoticiasScraper:
                 # Guardar progreso cada 10 noticias
                 if i % 10 == 0:
                     self.save_data()
+                    self.guardar_en_base_datos()
                     
             time.sleep(self.delay)
         
         # Guardar datos finales
         self.save_data()
+        self.guardar_en_base_datos()
         self.logger.info(f"Scraping completado. Total noticias: {len(self.news_data)}")
+
+    def guardar_en_base_datos(self):
+        """Guarda las noticias en la base de datos"""
+        try:
+            from database import DatabaseManager
+            from unified_scraper import normalize_news_data
+            
+            if not self.news_data:
+                return
+            
+            # Normalizar noticias
+            noticias_normalizadas = []
+            for noticia in self.news_data:
+                noticia_normalizada = normalize_news_data(noticia, 'puno_noticias')
+                noticias_normalizadas.append(noticia_normalizada)
+            
+            # Guardar en base de datos
+            db = DatabaseManager()
+            db.connect()
+            db.save_news_batch(noticias_normalizadas)
+            db.close()
+            
+            self.logger.info(f"✅ Guardadas {len(noticias_normalizadas)} noticias en base de datos")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error guardando en base de datos: {e}")
 
     def save_data(self):
         """Guardar datos en JSON y CSV"""

@@ -48,7 +48,7 @@ def scrape_source_internal(source_name: str, source_config: Dict, is_initial_scr
                     logger.warning(f"Error limpiando URLs procesadas para {source_name}: {e}")
             
             # Ejecutar scraping recursivo (como en codigos-claude) con límite de profundidad
-            scraper.scrape_noticias(max_noticias=None)
+            scraper.scrape_recursivo(max_noticias=None)
             noticias = scraper.news_data
                     
         elif source_name == 'los_andes':
@@ -108,6 +108,24 @@ def scrape_source_internal(source_name: str, source_config: Dict, is_initial_scr
         
         # Guardar archivos
         save_news_files(noticias_normalizadas, source_name)
+        
+        # Guardar en base de datos inmediatamente
+        if noticias_normalizadas:
+            try:
+                db = DatabaseManager()
+                db.connect()
+                
+                # Guardar noticias en lotes
+                batch_size = 50
+                for i in range(0, len(noticias_normalizadas), batch_size):
+                    batch = noticias_normalizadas[i:i + batch_size]
+                    db.save_news_batch(batch)
+                    logger.info(f"Guardado lote {i//batch_size + 1} de {source_name}: {len(batch)} noticias")
+                
+                db.close()
+                logger.info(f"✅ {source_name}: {len(noticias_normalizadas)} noticias guardadas en base de datos")
+            except Exception as e:
+                logger.error(f"❌ Error guardando {source_name} en base de datos: {e}")
         
         return {
             'source': source_name,

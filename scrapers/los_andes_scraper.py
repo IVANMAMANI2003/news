@@ -497,20 +497,57 @@ class LosAndesScraper:
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_to_url = {executor.submit(self.extract_article_data, url): url for url in new_urls}
             
+            processed_count = 0
             for future in as_completed(future_to_url):
                 url = future_to_url[future]
                 try:
                     article_data = future.result()
                     if article_data:
                         self.news_data.append(article_data)
+                        processed_count += 1
                         logger.info(f"Artículo procesado: {article_data['titulo'][:50]}...")
+                        
+                        # Guardar en base de datos cada 10 artículos
+                        if processed_count % 10 == 0:
+                            self.guardar_en_base_datos()
+                            
                 except Exception as e:
                     logger.error(f"Error procesando {url}: {str(e)}")
         
         # Guardar URLs scrapeadas
         self.save_scraped_urls()
         
+        # Guardar noticias restantes en base de datos
+        if self.news_data:
+            self.guardar_en_base_datos()
+        
         logger.info(f"Scraping completado. Nuevos artículos: {self.new_articles_count}")
         logger.info(f"Total de artículos en memoria: {len(self.news_data)}")
         
         return self.new_articles_count
+
+    def guardar_en_base_datos(self):
+        """Guarda las noticias en la base de datos"""
+        try:
+            from database import DatabaseManager
+            from unified_scraper import normalize_news_data
+            
+            if not self.news_data:
+                return
+            
+            # Normalizar noticias
+            noticias_normalizadas = []
+            for noticia in self.news_data:
+                noticia_normalizada = normalize_news_data(noticia, 'los_andes')
+                noticias_normalizadas.append(noticia_normalizada)
+            
+            # Guardar en base de datos
+            db = DatabaseManager()
+            db.connect()
+            db.save_news_batch(noticias_normalizadas)
+            db.close()
+            
+            logger.info(f"✅ Guardadas {len(noticias_normalizadas)} noticias en base de datos")
+            
+        except Exception as e:
+            logger.error(f"❌ Error guardando en base de datos: {e}")

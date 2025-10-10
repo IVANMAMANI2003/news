@@ -85,8 +85,17 @@ class PachamamaRadioScraper:
         try:
             response = self.session.get(url, timeout=30)
             response.raise_for_status()
-            response.encoding = response.apparent_encoding or 'utf-8'
-            return BeautifulSoup(response.content, 'html.parser')
+            
+            # Forzar decodificación UTF-8 y manejar compresión
+            response.encoding = 'utf-8'
+            content = response.text
+            
+            # Verificar que el contenido sea HTML válido
+            if not content.strip().startswith('<'):
+                self.logger.warning(f"Contenido no es HTML válido para {url}")
+                return None
+                
+            return BeautifulSoup(content, 'html.parser')
         except Exception as e:
             self.logger.error(f"Error al acceder a {url}: {e}")
             return None
@@ -409,8 +418,38 @@ class PachamamaRadioScraper:
             
             depth += 1
             self.logger.info(f"Nivel {depth} completado. Noticias extraídas hasta ahora: {total_noticias}")
+            
+            # Guardar en base de datos después de cada nivel
+            if total_noticias > 0:
+                self.guardar_en_base_datos()
         
         self.logger.info(f"Scraping completado. Total de noticias extraídas: {total_noticias}")
+
+    def guardar_en_base_datos(self):
+        """Guarda las noticias en la base de datos"""
+        try:
+            from database import DatabaseManager
+            from unified_scraper import normalize_news_data
+            
+            if not self.news_data:
+                return
+            
+            # Normalizar noticias
+            noticias_normalizadas = []
+            for noticia in self.news_data:
+                noticia_normalizada = normalize_news_data(noticia, 'pachamama')
+                noticias_normalizadas.append(noticia_normalizada)
+            
+            # Guardar en base de datos
+            db = DatabaseManager()
+            db.connect()
+            db.save_news_batch(noticias_normalizadas)
+            db.close()
+            
+            self.logger.info(f"✅ Guardadas {len(noticias_normalizadas)} noticias en base de datos")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error guardando en base de datos: {e}")
 
     def es_noticia_individual(self, soup: BeautifulSoup, url: str) -> bool:
         """Determina si una página es una noticia individual"""
