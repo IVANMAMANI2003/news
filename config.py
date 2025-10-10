@@ -22,17 +22,17 @@ class Config:
     SCRAPING = {
         'delay_between_sources': int(os.getenv('SCRAPING_DELAY', 5)),
         'max_workers_per_source': int(os.getenv('SCRAPING_WORKERS', 3)),
-        'timeout': int(os.getenv('SCRAPING_TIMEOUT', 30)),
+        'timeout': None,  # Sin límite de tiempo
         'max_retries': int(os.getenv('SCRAPING_RETRIES', 3)),
         'enable_incremental': os.getenv('SCRAPING_INCREMENTAL', 'true').lower() == 'true',
-        'max_articles_per_source': int(os.getenv('SCRAPING_MAX_ARTICLES', 1000))
+        'max_articles_per_source': None  # Sin límite de artículos
     }
     
     # Configuración de scheduler
     SCHEDULER = {
         'interval_hours': int(os.getenv('SCHEDULER_INTERVAL', 1)),
         'max_concurrent_jobs': int(os.getenv('SCHEDULER_MAX_JOBS', 1)),
-        'timeout_minutes': int(os.getenv('SCHEDULER_TIMEOUT', 120)),
+        'timeout_minutes': None,  # Sin límite de tiempo
         'retry_failed_jobs': os.getenv('SCHEDULER_RETRY', 'true').lower() == 'true',
         'max_retries': int(os.getenv('SCHEDULER_MAX_RETRIES', 3)),
         'retry_delay_minutes': int(os.getenv('SCHEDULER_RETRY_DELAY', 30))
@@ -40,25 +40,27 @@ class Config:
     
     # Configuración de fuentes
     SOURCES = {
-        'diario_sin_fronteras': {
-            'enabled': os.getenv('SOURCE_SIN_FRONTERAS', 'true').lower() == 'true',
-            'base_url': 'https://diariosinfronteras.com.pe/',
-            'delay': int(os.getenv('SOURCE_SIN_FRONTERAS_DELAY', 2))
+        'pachamama': {
+            'enabled': os.getenv('SOURCE_PACHAMAMA', 'true').lower() == 'true',
+            'base_url': 'https://pachamamaradio.org/',
+            'delay': int(os.getenv('SOURCE_PACHAMAMA_DELAY', 1))
+        },
+        'puno_noticias': {
+            'enabled': os.getenv('SOURCE_PUNO_NOTICIAS', 'true').lower() == 'true',
+            'base_url': 'https://punonoticias.pe/',
+            'delay': int(os.getenv('SOURCE_PUNO_NOTICIAS_DELAY', 1))
         },
         'los_andes': {
             'enabled': os.getenv('SOURCE_LOS_ANDES', 'true').lower() == 'true',
             'base_url': 'https://losandes.com.pe',
             'delay': int(os.getenv('SOURCE_LOS_ANDES_DELAY', 1))
         },
-        'pachamama': {
-            'enabled': os.getenv('SOURCE_PACHAMAMA', 'true').lower() == 'true',
-            'base_url': 'https://pachamamaradio.org/',
-            'delay': int(os.getenv('SOURCE_PACHAMAMA_DELAY', 2))
-        },
-        'puno_noticias': {
-            'enabled': os.getenv('SOURCE_PUNO_NOTICIAS', 'true').lower() == 'true',
-            'base_url': 'https://punonoticias.pe/',
-            'delay': int(os.getenv('SOURCE_PUNO_NOTICIAS_DELAY', 1))
+
+        
+        'diario_sin_fronteras': {
+            'enabled': os.getenv('SOURCE_SIN_FRONTERAS', 'true').lower() == 'true',
+            'base_url': 'https://diariosinfronteras.com.pe/',
+            'delay': int(os.getenv('SOURCE_SIN_FRONTERAS_DELAY', 1))
         }
     }
     
