@@ -12,13 +12,7 @@ from typing import Dict, List, Optional
 from celery import current_task
 
 from celery_config import celery_app
-
 # Importar scrapers
-sys.path.append('codigos-claude/diario-sinfronteras')
-sys.path.append('codigos-claude/los-andes')
-sys.path.append('codigos-claude/pachamama')
-sys.path.append('codigos-claude/puno-noticias')
-
 from database import DatabaseManager
 from unified_scraper import normalize_news_data, save_news_files
 

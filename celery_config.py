@@ -34,9 +34,6 @@ celery_app.conf.update(
     worker_max_tasks_per_child=1000,
     worker_concurrency=1,  # Solo un worker para evitar conflictos
     
-    # Configuración de timeouts
-    task_soft_time_limit=300,  # 5 minutos
-    task_time_limit=600,       # 10 minutos
     
     # Configuración de reintentos
     task_default_retry_delay=60,
