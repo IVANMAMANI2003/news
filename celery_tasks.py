@@ -109,7 +109,7 @@ def scrape_source(self, source_name: str, source_config: Dict) -> Dict:
         logger.error(f"Error en scraping de {source_name}: {e}")
         self.update_state(
             state='FAILURE',
-            meta={'error': str(e), 'source': source_name}
+            meta={'error': str(e), 'source': source_name, 'exc_type': type(e).__name__}
         )
         raise
 
@@ -214,7 +214,7 @@ def scheduled_scraping():
                     logger.info(f"Completado: {source['name']}")
                 except Exception as e:
                     logger.error(f"Error en fuente {source['name']}: {e}")
-                    results.append({'error': str(e), 'source': source['name']})
+                    results.append({'error': str(e), 'source': source['name'], 'exc_type': type(e).__name__})
         
         # Guardar estadísticas
         save_scraping_stats(results)
@@ -258,7 +258,7 @@ def scrape_new_news():
                     logger.info(f"Completado: {source['name']}")
                 except Exception as e:
                     logger.error(f"Error en fuente {source['name']}: {e}")
-                    results.append({'error': str(e), 'source': source['name']})
+                    results.append({'error': str(e), 'source': source['name'], 'exc_type': type(e).__name__})
         
         # Guardar estadísticas
         save_scraping_stats(results)
