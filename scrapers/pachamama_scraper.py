@@ -83,23 +83,26 @@ class PachamamaRadioScraper:
     def hacer_request(self, url: str) -> BeautifulSoup:
         """Realiza una petición HTTP con manejo de errores"""
         try:
-            # Usar requests directamente para evitar problemas con la sesión
+            # Usar requests directamente SIN compresión
             import requests
             
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
+                # NO incluir Accept-Encoding para evitar compresión
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1'
             }
             
-            response = requests.get(url, timeout=30, headers=headers)
+            # Deshabilitar compresión completamente
+            response = requests.get(url, timeout=30, headers=headers, stream=False)
             response.raise_for_status()
             
+            # Forzar decodificación manual
+            content = response.content.decode('utf-8', errors='ignore')
+            
             # Verificar que el contenido sea HTML válido
-            content = response.text
             if not content.strip().startswith('<'):
                 self.logger.warning(f"Contenido no es HTML válido para {url}. Primeros 100 chars: {content[:100]}")
                 return None
